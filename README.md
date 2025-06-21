@@ -27,11 +27,9 @@
 2.  **安装Conan依赖**
     此命令会读取 `conanfile.py`，下载依赖，并在 `build/` 目录下生成CMake集成所需的文件。
     ```bash
-    # For Release build
-    conan install . --output-folder=build/release --build=missing -s build_type=Release
-
-    # For Debug build
-    conan install . --output-folder=build/debug --build=missing -s build_type=Debug
+    # 注意：不再需要 --output-folder
+    conan install . -s build_type=Debug --build=missing    # For Debug build
+    conan install . -s build_type=Release --build=missing    # For Debug build
     ```
 
 3.  **配置CMake项目**
