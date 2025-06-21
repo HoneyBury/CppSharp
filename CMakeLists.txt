@@ -3,6 +3,26 @@
 # 1. 设置CMake最低版本和项目信息
 cmake_minimum_required(VERSION 3.15)
 project(MyProject LANGUAGES CXX)
+# =================== 新增部分：健壮的输出目录设置 (最终版) ===================
+# 包含此模块以使用 CMAKE_CFG_INTDIR 变量，它能优雅地处理
+# 单配置（如Makefile）和多配置（如Visual Studio）生成器。
+include(GNUInstallDirs)
+
+# 对于可执行文件 (runtime)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR})
+
+# 对于库文件 (archive for static, library for shared)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
+
+# 对于Visual Studio（多配置生成器），需要特别处理以避免创建额外的Debug/Release子目录
+foreach(config ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER ${config} config_upper)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${config_upper} ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR})
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
+endforeach()
+# ==============================================================================
 
 # 2. 将自定义CMake模块路径添加到搜索路径
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -31,9 +51,9 @@ if(BUILD_TESTING)
 endif()
 
 # (可选) 安装规则
- include(GNUInstallDirs)
- install(TARGETS my_app RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
- install(TARGETS my_lib ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
- install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/my_lib/ PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# include(GNUInstallDirs)
+# install(TARGETS my_app RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# install(TARGETS my_lib ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+#                      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+#                      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/my_lib/ PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

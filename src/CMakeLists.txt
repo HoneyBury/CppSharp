@@ -41,4 +41,4 @@ target_link_libraries(app PRIVATE my_lib)
 set_project_properties(app)
 
 # 7. (可选) 设置输出目录，使结构更整洁
-set_target_properties(app PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+#set_target_properties(app PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

@@ -1,4 +1,4 @@
-# My Modern C++ Project
+﻿# My Modern C++ Project
 
 这是一个基于现代CMake和Conan 2.0的C++项目脚手架。
 

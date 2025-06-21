@@ -1,4 +1,4 @@
-#ifndef MY_LIB_HPP
+﻿#ifndef MY_LIB_HPP
 #define MY_LIB_HPP
 
 #include <string>
