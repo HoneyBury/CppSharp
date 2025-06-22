@@ -2,7 +2,7 @@
 
 # 1. 设置CMake最低版本和项目信息
 cmake_minimum_required(VERSION 3.15)
-project(MyProject LANGUAGES CXX)
+project(Project VERSION 1.0.0 LANGUAGES CXX)
 # =================== 新增部分：健壮的输出目录设置 (最终版) ===================
 # 包含此模块以使用 CMAKE_CFG_INTDIR 变量，它能优雅地处理
 # 单配置（如Makefile）和多配置（如Visual Studio）生成器。
@@ -50,10 +50,50 @@ if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
-# (可选) 安装规则
-# include(GNUInstallDirs)
-# install(TARGETS my_app RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-# install(TARGETS my_lib ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-#                      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-#                      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-# install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/my_lib/ PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# =================== 新增：安装与打包配置 ===================
+# 1. 包含CMake的打包和安装辅助模块
+include(CMakePackageConfigHelpers)
+include(CPack)
+# 在 include(CPack) 之后添加
+set(CPACK_GENERATOR "NSIS") # Windows
+set(CPACK_GENERATOR "DEB")  # Debian/Ubuntu
+set(CPACK_GENERATOR "RPM")  # Fedora/CentOS
+set(CPACK_SOURCE_IGNORE_FILES
+        "/.git/"
+        "/build/"
+        "/.vscode/"
+        "/.idea/"
+        ".DS_Store"
+        "*.swp"
+        "*.bak"
+)
+
+# 2. 生成 MyProjectConfigVersion.cmake 文件
+#    这允许其他项目在find_package时指定版本，例如 find_package(MyProject 1.0.0 EXACT)
+write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY AnyNewerVersion
+)
+
+# 3. 配置并生成 MyProjectConfig.cmake 文件
+#    这是find_package的核心
+configure_package_config_file(
+        "${PROJECT_SOURCE_DIR}/cmake/config.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+)
+# 4. 将生成的配置文件安装到指定位置
+install(FILES
+"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+)
+
+# 5. 安装由我们导出的目标文件 (MyProjectTargets.cmake)
+install(EXPORT ${PROJECT_NAME}Targets
+FILE ${PROJECT_NAME}Targets.cmake
+NAMESPACE ${PROJECT_NAME}::
+DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+)
+# ==========================================================

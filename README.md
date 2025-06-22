@@ -36,10 +36,10 @@
     使用Conan生成的toolchain文件来配置CMake。
     ```bash
     # Configure for Release
-    cmake -S . -B build/release -DCMAKE_TOOLCHAIN_FILE=build/release/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
+    cmake -S . -B build/release -DCMAKE_TOOLCHAIN_FILE="build/release/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
 
     # Configure for Debug
-    cmake -S . -B build/debug -DCMAKE_TOOLCHAIN_FILE=build/debug/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
+    cmake -S . -B build/debug -DCMAKE_TOOLCHAIN_FILE="build/debug/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Debug
     ```
 
 4.  **构建项目**

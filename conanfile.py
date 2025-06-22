@@ -1,39 +1,61 @@
 ﻿# conanfile.py
 from conan import ConanFile
-from conan.tools.cmake import cmake_layout
-from conan.errors import ConanException
+from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
+import os
 
 class MyProjectConan(ConanFile):
+    # --- 1. 元数据：描述你的包 ---
+    name = "MyProject"
+    version = "1.0.0"
+    license = "<MIT>"  # 例如 "MIT"
+    author = "<HoneyBury> <zoujiahe389@gmail.com>"
+    url = "<https://github.com/HoneyBury/CppSharp.git>"
+    description = "A modern C++ project template."
+    topics = ("template", "modern-cpp", "cmake", "conan")
+
+    # --- 2. 配置：定义包的二进制变体 ---
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    options = {"shared": [True, False], "fPIC": [True, False]}
+    default_options = {"shared": False, "fPIC": True}
 
-    def requirements(self):
-        self.requires("fmt/10.2.1")
-        self.requires("spdlog/1.12.0")
-        self.requires("gtest/1.14.0")
+    # --- 3. 导出：指定哪些文件是配方的一部分 ---
+    # 当我们创建包时，这些文件会被复制到Conan缓存中
+    exports_sources = "CMakeLists.txt", "src/*", "cmake/*"
 
-    def configure(self):
-        # 确保在 MSVC 下，Debug 和 Release 使用正确的运行时库
-        # 这可以防止与预编译的依赖库发生链接冲突
-        if self.settings.os == "Windows" and self.settings.compiler == "msvc":
-            if self.settings.build_type == "Debug":
-                self.options["gtest"].shared = False # 确保gtest是静态库
-                # self.settings.compiler.runtime = "MTd"
-            else:
-                self.options["gtest"].shared = False
-                # self.settings.compiler.runtime = "MT"
+    # --- 4. 布局：告诉Conan源码和构建目录的位置 ---
     def layout(self):
-        # 这是现代Conan 2.0的最佳实践。
-        # 它将根据构建类型（Debug/Release）自动配置构建和生成器目录。
+        cmake_layout(self)
 
-        # 检查 build_type 是否被设置。这是一个好习惯。
-        if not self.settings.build_type:
-            raise ConanException("Build type not set. Please specify with '-s build_type=Debug' or '-s build_type=Release'")
+    # --- 5. 生成器：为消费者项目生成集成文件 ---
+    def generate(self):
+        deps = CMakeDeps(self)
+        deps.generate()
+        tc = CMakeToolchain(self)
+        # 传递选项给CMake，以便在CMakeLists.txt中可以使用
+        tc.variables["BUILD_TESTING"] = False # 打包时不构建测试
+        tc.generate()
 
-        # 根据构建类型，将文件夹设置为 "build/debug" 或 "build/release"
-        build_type_folder = str(self.settings.build_type).lower()
-        self.folders.build = f"build/{build_type_folder}"
+    # --- 6. 构建：描述如何从源码编译你的包 ---
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
 
-        # 关键：将生成器目录设置为与构建目录相同。
-        # 这可以确保 conan_toolchain.cmake 直接生成在 build/debug 或 build/release 目录下。
-        self.folders.generators = self.folders.build
+    # --- 7. 打包：描述如何从构建目录中收集产物 ---
+    def package(self):
+        # 这个方法会将文件从构建目录复制到最终的包目录
+        # 我们在这里实际上是调用了CMake的安装步骤！
+        cmake = CMake(self)
+        cmake.install()
+
+    # --- 8. 包信息：描述如何让消费者使用你的包 ---
+    def package_info(self):
+        # 这一步至关重要，它定义了消费者需要知道的一切
+
+        # 告诉消费者，我们的库名叫 "my_lib"
+        # Conan会自动处理好 .lib/.a 后缀和前缀
+        self.cpp_info.libs = ["my_lib"]
+
+        # 告诉消费者，需要链接到我们包的依赖项
+        # 这是通过 requires="fmt/..." 自动处理的，但如果需要可以手动添加
+        # self.cpp_info.requires = ["fmt::fmt", "spdlog::spdlog"]

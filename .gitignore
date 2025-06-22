@@ -32,3 +32,5 @@ Testing/
 
 # Mac files
 .DS_Store
+build/
+cmake-build-*/
