@@ -2,18 +2,6 @@
 
 # 1. 设置CMake最低版本和项目信息
 cmake_minimum_required(VERSION 3.15)
-# 1. Conan集成 (必须放在最前面，在 project() 之前！)
-#    这是现代CMake与Conan集成的关键。
-#    con    an_toolchain.cmake必须在project()之前被包含，
-#    以便它能正确设置编译器和各种路径。
-if(EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
-    include("${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
-else()
-    message(WARNING "Conan toolchain file not found at '${CMAKE_BINARY_DIR}/conan_toolchain.cmake'.\n"
-            "Proceeding with system toolchain. This is normal for the first CMake run.")
-endif()
-
-
 project(Project VERSION 1.0.0 LANGUAGES CXX)
 # =================== 新增部分：健壮的输出目录设置 (最终版) ===================
 # 包含此模块以使用 CMAKE_CFG_INTDIR 变量，它能优雅地处理
@@ -45,7 +33,7 @@ include(utils)
 
 # 4. 设置全局构建选项
 # 我们可以提供一个选项来决定是否构建测试
-option(BUILD_TESTING "Build the tests" ON)
+option(BUILD_TESTING "Build the tests" OFF)
 
 # 5. 添加源代码子目录
 add_subdirectory(src)
