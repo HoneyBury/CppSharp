@@ -11,7 +11,7 @@ class MyProjectConan(ConanFile):
 
     # 1. Package Metadata
     name = "myproject"
-    version = "1.0.2"
+    version = "2.0.0"
     license = "MIT"
     author = "Your Name <you@example.com>"
     url = "https://github.com/your-repo/myproject"
