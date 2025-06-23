@@ -52,23 +52,31 @@ jobs:
       - name: Install dependencies with Conan
         run: conan install . --build=missing -s build_type=${{ matrix.build_type }}
 
-      # 步骤 6: 使用 CMake Presets 配置项目 (已修正)
+      # (!!!) NEW STEP: Set lowercase build type in a cross-platform way (!!!)
+      # This step generates a lowercase version of the build type and makes it available to other steps.
+      # This is the universal workaround for older GitHub Enterprise Servers that lack the toLower() function.
+      - name: Set lowercase build type
+        id: build_type_lc # Give this step an ID so we can reference its output
+        shell: bash # Explicitly use bash for consistent syntax
+        run: echo "value=${{ matrix.build_type,, }}" >> $GITHUB_OUTPUT
+
+      # 步骤 6: 使用 CMake Presets 配置项目 (MODIFIED)
+      # We now use the output from the previous step.
       - name: Configure CMake
-        run: cmake --preset conan-${{ toLower(matrix.build_type) }} -DBUILD_TESTING=ON
+        run: cmake --preset conan-${{ steps.build_type_lc.outputs.value }} -DBUILD_TESTING=ON
 
-      # 步骤 7: 使用 CMake Presets 构建项目 (已修正)
+      # 步骤 7: 使用 CMake Presets 构建项目 (MODIFIED)
       - name: Build project with CMake
-        run: cmake --build --preset conan-${{ toLower(matrix.build_type) }}
+        run: cmake --build --preset conan-${{ steps.build_type_lc.outputs.value }}
 
-      # 步骤 8: 运行单元测试 (仅在 Debug 模式下) (已修正)
+      # 步骤 8: 运行单元测试 (仅在 Debug 模式下) (MODIFIED)
       - name: Run Unit Tests with CTest
         if: matrix.build_type == 'Debug'
-        run: ctest --preset conan-${{ toLower(matrix.build_type) }} --output-on-failure
+        run: ctest --preset conan-${{ steps.build_type_lc.outputs.value }} --output-on-failure
 
-      # 步骤 9: 使用 CPack 创建安装包 (仅在 Release 模式下)
+      # 步骤 9: 使用 CPack 创建安装包 (仅在 Release 模式下) - No change needed here
       - name: Create package with CPack
         if: matrix.build_type == 'Release'
-        # 这里是硬编码的 release，因为此步骤只在 Release 模式下运行
         run: cpack --preset conan-release
 
       # 步骤 10: 上传构建产物 (安装包)
