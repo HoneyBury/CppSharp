@@ -52,16 +52,15 @@ jobs:
       - name: Install dependencies with Conan
         run: conan install . --build=missing -s build_type=${{ matrix.build_type }}
 
-      # (!!!) 最终修正步骤：以跨平台方式设置小写构建类型 (!!!)
-      # 这个步骤是解决问题的关键，它保证能在所有环境下正常工作。
+      # (!!!) 最终修正步骤：使用 tr 命令实现可移植的大小写转换 (!!!)
       - name: Set lowercase build type
         id: build_type_lc
-        shell: bash # 强制在所有平台 (包括Windows) 上使用 bash
         run: |
-          # 1. 使用合法的 Actions 表达式将 matrix.build_type 的值赋给一个 shell 变量
-          TYPE_UC="${{ matrix.build_type }}"
-          # 2. 在 shell 内部，使用纯粹的 bash 语法将变量转为小写，并输出
-          echo "value=${TYPE_UC,,}" >> $GITHUB_OUTPUT
+          # 使用 tr 命令，它在所有 Unix 系统中都可用，包括旧版 macOS 的 bash
+          # 将 matrix.build_type 的值通过管道传给 tr，tr 将所有大写字符 '[:upper:]' 转换为小写 '[:lower:]'
+          TYPE_LC=$(echo "${{ matrix.build_type }}" | tr '[:upper:]' '[:lower:]')
+          echo "value=$TYPE_LC" >> $GITHUB_OUTPUT
+        shell: bash
 
       # 步骤 6: 使用 CMake Presets 配置项目 (使用修正后的输出)
       - name: Configure CMake
