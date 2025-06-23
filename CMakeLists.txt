@@ -2,7 +2,7 @@
 
 # 1. 设置CMake最低版本和项目信息
 cmake_minimum_required(VERSION 3.15)
-project(Project VERSION 1.0.1 LANGUAGES CXX)
+project(Project VERSION 1.0.2 LANGUAGES CXX)
 # =================== 新增部分：健壮的输出目录设置 (最终版) ===================
 # 包含此模块以使用 CMAKE_CFG_INTDIR 变量，它能优雅地处理
 # 单配置（如Makefile）和多配置（如Visual Studio）生成器。
