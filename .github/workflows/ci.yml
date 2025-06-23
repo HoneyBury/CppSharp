@@ -19,7 +19,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      # 步骤 1-5 保持不变...
+      # 步骤 1-5: 保持不变
       - name: Checkout repository code
         uses: actions/checkout@v4
 
@@ -48,58 +48,29 @@ jobs:
       - name: Install dependencies with Conan
         run: conan install . --build=missing -s build_type=${{ matrix.build_type }}
 
+      # 步骤 5.5: 依然需要这个步骤来得到小写名 'debug'/'release'
       - name: Set lowercase build type
         id: build_type_lc
         run: echo "value=$(echo "${{ matrix.build_type }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
         shell: bash
 
-      # (!!!) 步骤 6: 平台感知的 CMake 配置 (!!!)
+      # (!!!) 步骤 6: 统一的 CMake 配置 (!!!)
       - name: Configure CMake
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            # Windows 使用 'conan-default' preset
-            cmake --preset conan-default -DBUILD_TESTING=ON
-          else
-            # Linux/macOS 使用 'conan-debug' 或 'conan-release'
-            cmake --preset conan-${{ steps.build_type_lc.outputs.value }} -DBUILD_TESTING=ON
-          fi
+        run: cmake --preset conan-${{ steps.build_type_lc.outputs.value }} -DBUILD_TESTING=ON
 
-      # (!!!) 步骤 7: 平台感知的 CMake 构建 (!!!)
+      # (!!!) 步骤 7: 统一的 CMake 构建 (!!!)
       - name: Build project with CMake
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            # Windows (多配置) 必须在构建时通过 --config 指定配置
-            cmake --build --preset conan-default --config ${{ matrix.build_type }}
-          else
-            # Linux/macOS (单配置) 的配置已在 preset 中确定
-            cmake --build --preset conan-${{ steps.build_type_lc.outputs.value }}
-          fi
+        run: cmake --build --preset conan-${{ steps.build_type_lc.outputs.value }}
 
-      # (!!!) 步骤 8: 平台感知的单元测试 (!!!)
+      # (!!!) 步骤 8: 统一的单元测试 (!!!)
       - name: Run Unit Tests with CTest
         if: matrix.build_type == 'Debug'
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            # Windows CTest 同样需要 -C 来指定要测试的配置
-            ctest --preset conan-default -C Debug
-          else
-            ctest --preset conan-debug
-          fi
+        run: ctest --preset conan-debug
 
-      # (!!!) 步骤 9: 平台感知的打包 (!!!)
+      # (!!!) 步骤 9: 统一的打包 (!!!)
       - name: Create package with CPack
         if: matrix.build_type == 'Release'
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            # Windows 打包也需要指定配置
-            cmake --build --preset conan-default --config Release --target package
-          else
-            cmake --build --preset conan-release --target package
-          fi
+        run: cmake --build --preset conan-release --target package
 
       # 步骤 10: 上传产物 - 无需改动
       - name: Upload Build Artifacts
