@@ -71,20 +71,15 @@ jobs:
       - name: Create package with CPack
         run: cmake --build --preset conan-release --target package
       
-      # 9. 上传生成的安装包作为临时 Artifact
-      # 我们将为每个平台的包创建一个单独的 artifact，方便后续下载
+      # (!!!) 步骤 9: 修正上传路径 (!!!)
       - name: Upload Package Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: package-${{ matrix.os }} # 例如: package-windows-latest
-          path: | # 包含所有可能的打包产物
-            *.deb
-            *.rpm
-            *.exe
-            *.zip
-            *.tar.gz
-            *.dmg
-          if-no-files-found: ignore
+          name: package-${{ matrix.os }}
+          # 这是关键修正！我们告诉它去 build 目录以及其所有子目录里寻找产物。
+          # 'build/**' 会找到例如 'build/myproject.exe' 或 'build/Release/myproject.deb'
+          path: build/**
+          if-no-files-found: error # 我们现在可以自信地让它在找不到文件时报错
 
   # ====================================================================
   # JOB 2: 创建 GitHub Release 并上传所有产物
