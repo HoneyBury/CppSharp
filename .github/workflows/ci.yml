@@ -1,0 +1,103 @@
+# .github/workflows/ci.yml
+
+name: C++ CI with Conan, CMake, and CPack
+
+# 触发条件：推送到 main 分支或向 main 分支发起 Pull Request 时触发
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-test-package:
+    name: ${{ matrix.os }} - ${{ matrix.build_type }}
+    # 使用策略矩阵来定义不同的构建环境
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        build_type: [Debug, Release]
+        # 优化：可以排除某些不必要的组合，但这里我们全部构建
+        # exclude:
+        #   - os: macos-latest
+        #     build_type: Debug
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      # 步骤 1: 检出代码
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      # 步骤 2: 安装 CPack 所需的打包工具 (仅在需要时)
+      - name: Install CPack Generators
+        if: matrix.build_type == 'Release' && runner.os == 'Windows'
+        run: choco install nsis
+        # 注意: Linux (ubuntu-latest) 自带 dpkg-deb 来创建 .deb 包。
+        # 如果需要创建 RPM, 则需 run: sudo apt-get update && sudo apt-get install rpm
+
+      # 步骤 3: 设置 Python 和 Conan 环境
+      - name: Setup Python for Conan
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install Conan and create default profile
+        run: |
+          pip install conan
+          conan profile detect --force
+
+      # 步骤 4: 缓存 Conan 包以加速构建
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('**/conanfile.py') }}
+          restore-keys: |
+            conan-${{ runner.os }}-${{ matrix.build_type }}-
+
+      # 步骤 5: 使用 Conan 安装依赖
+      # Conan 会根据配置生成 CMakePresets.json，这是现代 CMake 的最佳实践
+      - name: Install dependencies with Conan
+        run: conan install . --build=missing -s build_type=${{ matrix.build_type }}
+
+      # 步骤 6: 使用 CMake Presets 配置项目
+      # -DBUILD_TESTING=ON 确保测试目标总是被构建
+      - name: Configure CMake
+        run: cmake --preset conan-${{ matrix.build_type,, }} -DBUILD_TESTING=ON
+
+      # 步骤 7: 使用 CMake Presets 构建项目
+      - name: Build project with CMake
+        run: cmake --build --preset conan-${{ matrix.build_type,, }}
+
+      # 步骤 8: 运行单元测试 (仅在 Debug 模式下)
+      # 通常在 Debug 模式下测试就足够了，可以更快地发现逻辑错误
+      - name: Run Unit Tests with CTest
+        if: matrix.build_type == 'Debug'
+        # 使用 preset 运行 CTest，它会自动处理工作目录和配置
+        run: ctest --preset conan-${{ matrix.build_type,, }} --output-on-failure
+
+      # 步骤 9: 使用 CPack 创建安装包 (仅在 Release 模式下)
+      - name: Create package with CPack
+        if: matrix.build_type == 'Release'
+        # 使用 preset 运行 CPack，它会找到正确的配置和构建产物
+        run: cpack --preset conan-release
+
+      # 步骤 10: 上传构建产物 (安装包)
+      - name: Upload Build Artifacts
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          # 为产物命名，包含操作系统信息
+          name: myproject-package-${{ matrix.os }}
+          # 上传构建目录中所有符合 CPack 输出格式的文件
+          path: |
+            build/Release/
+            build/
+            *.deb
+            *.rpm
+            *.exe
+            *.zip
+            *.tar.gz
+          # 如果找不到文件也不要报错
+          if-no-files-found: ignore
