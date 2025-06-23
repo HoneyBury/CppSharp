@@ -19,13 +19,14 @@ jobs:
       - name: Checkout repository code
         uses: actions/checkout@v4
 
-      # 步骤 2: 安装 Pandoc, XeLaTeX 引擎, 以及支持 Emoji 的字体 (已修改)
-      # 1. texlive-xetex: 安装 xelatex 引擎
-      # 2. fonts-noto-color-emoji: 安装 Google Noto 字体，它包含了对 Emoji 的良好支持
-      - name: Install Pandoc and XeLaTeX with Emoji support
+      # 步骤 2: 安装 Pandoc, XeLaTeX, 完整的 Noto 字体并刷新缓存 (已修改)
+      # 1. fonts-noto: 这是一个元数据包，会安装完整的 Noto 字体家族，包括 Sans, Serif, Mono 和 Emoji。
+      # 2. fc-cache -fv: 强制刷新系统字体缓存，这是关键一步！
+      - name: Install Pandoc, XeLaTeX, and full Noto font suite
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc texlive-xetex fonts-noto-color-emoji
+          sudo apt-get install -y pandoc texlive-xetex fonts-noto
+          sudo fc-cache -fv
 
       # 步骤 3: 提取版本号并进行校验
       - name: Extract and Verify Version
@@ -44,7 +45,7 @@ jobs:
           echo "version=${CMAKE_VERSION}" >> $GITHUB_OUTPUT
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
 
-      # 步骤 4: 准备并生成发布文档 (已修改)
+      # 步骤 4: 准备并生成发布文档 (使用更完整的字体配置)
       - name: Generate Release Documents
         run: |
           cp CHANGELOG.md version.md
@@ -52,11 +53,10 @@ jobs:
           
           PDF_FILENAME="version-${{ steps.version_check.outputs.version }}.pdf"
           
-          # 使用 --pdf-engine=xelatex 来指定新的编译器
-          # 使用 -V mainfont="Noto Sans" 来指定一个支持 Unicode 的主字体
+          # -V sansfont: 明确指定无衬线字体，这比 mainfont 更适合 Markdown 的默认输出
           pandoc version.md \
             --pdf-engine=xelatex \
-            -V mainfont="Noto Sans" \
+            -V "sansfont:Noto Sans" \
             -o "${PDF_FILENAME}"
           
           echo "Generated ${PDF_FILENAME}"
