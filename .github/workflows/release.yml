@@ -19,13 +19,13 @@ jobs:
       - name: Checkout repository code
         uses: actions/checkout@v4
 
-      # 步骤 2: 安装 Pandoc 和完整的 LaTeX 环境 (已修正)
-      # 这里安装了 texlive-latex-recommended 和 texlive-latex-extra，
-      # 它们包含了 xcolor.sty 以及其他常用宏包。
-      - name: Install Pandoc and a more complete LaTeX distribution
+      # 步骤 2: 安装 Pandoc, XeLaTeX 引擎, 以及支持 Emoji 的字体 (已修改)
+      # 1. texlive-xetex: 安装 xelatex 引擎
+      # 2. fonts-noto-color-emoji: 安装 Google Noto 字体，它包含了对 Emoji 的良好支持
+      - name: Install Pandoc and XeLaTeX with Emoji support
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc texlive-latex-recommended texlive-latex-extra lmodern
+          sudo apt-get install -y pandoc texlive-xetex fonts-noto-color-emoji
 
       # 步骤 3: 提取版本号并进行校验
       - name: Extract and Verify Version
@@ -36,7 +36,6 @@ jobs:
           
           CMAKE_VERSION=$(grep -oP 'project\(.*?VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
           echo "CMake Version: ${CMAKE_VERSION}"
-
           if [ "${TAG_NAME#v}" != "$CMAKE_VERSION" ]; then
             echo "::error::Version mismatch! Git tag is '${TAG_NAME}' but CMake version is '${CMAKE_VERSION}'."
             exit 1
@@ -45,7 +44,7 @@ jobs:
           echo "version=${CMAKE_VERSION}" >> $GITHUB_OUTPUT
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
 
-      # 步骤 4: 准备并生成发布文档
+      # 步骤 4: 准备并生成发布文档 (已修改)
       - name: Generate Release Documents
         run: |
           cp CHANGELOG.md version.md
@@ -53,8 +52,13 @@ jobs:
           
           PDF_FILENAME="version-${{ steps.version_check.outputs.version }}.pdf"
           
-          # 这条命令现在应该可以成功运行了
-          pandoc version.md -o "${PDF_FILENAME}"
+          # 使用 --pdf-engine=xelatex 来指定新的编译器
+          # 使用 -V mainfont="Noto Sans" 来指定一个支持 Unicode 的主字体
+          pandoc version.md \
+            --pdf-engine=xelatex \
+            -V mainfont="Noto Sans" \
+            -o "${PDF_FILENAME}"
+          
           echo "Generated ${PDF_FILENAME}"
 
       # 步骤 5: 创建 GitHub Release 并上传产物
