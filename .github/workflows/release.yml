@@ -1,72 +1,138 @@
-# 工作流的名称，会显示在 GitHub 的 "Actions" 页面上
+# .github/workflows/release.yml (最终整合版)
+
 name: Create Project Release
 
-# 触发条件
+# 触发条件：当一个以 'v' 开头的 tag 被推送到仓库时
 on:
   push:
     tags:
       - 'v*'
 
 jobs:
-  create-release-assets:
-    name: Build, Document, and Release
-    runs-on: ubuntu-latest
+  # ====================================================================
+  # JOB 1: 在所有平台上构建和打包项目
+  # ====================================================================
+  build_and_package:
+    name: Build & Package on ${{ matrix.os }}
+    # 使用矩阵在所有目标平台上运行
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    runs-on: ${{ matrix.os }}
     permissions:
-      contents: write
+      contents: read # 此 job 只需读取代码
 
     steps:
-      # 步骤 1: 检出代码
+      # 1. 检出代码
       - name: Checkout repository code
         uses: actions/checkout@v4
 
-      # 步骤 2: 安装 Pandoc, XeLaTeX, 完整的 Noto 字体并刷新缓存 (已修改)
-      # 1. fonts-noto: 这是一个元数据包，会安装完整的 Noto 字体家族，包括 Sans, Serif, Mono 和 Emoji。
-      # 2. fc-cache -fv: 强制刷新系统字体缓存，这是关键一步！
-      - name: Install Pandoc, XeLaTeX, and full Noto font suite
+      # 2. 安装 CPack 所需的打包工具 (仅在 Windows 上需要)
+      - name: Install CPack Generators
+        if: runner.os == 'Windows'
+        run: choco install nsis
+
+      # 3. 安装 Python 和 Conan
+      - name: Setup Python and Conan
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install conan && conan profile detect --force
+
+      # 4. 缓存 Conan 包
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-Release-${{ hashFiles('**/conanfile.py') }}
+          restore-keys: |
+            conan-${{ runner.os }}-Release-
+
+      # 5. 安装依赖 (只针对 Release 配置)
+      - name: Install dependencies for Release
+        run: conan install . --build=missing -s build_type=Release
+
+      # 6. 平台感知的 CMake 配置
+      - name: Configure CMake
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            cmake --preset conan-default -DBUILD_TESTING=OFF
+          else
+            cmake --preset conan-release -DBUILD_TESTING=OFF
+          fi
+
+      # 7. 构建项目
+      - name: Build project
+        run: cmake --build --preset conan-release
+
+      # 8. 打包项目
+      - name: Create package with CPack
+        run: cmake --build --preset conan-release --target package
+      
+      # 9. 上传生成的安装包作为临时 Artifact
+      # 我们将为每个平台的包创建一个单独的 artifact，方便后续下载
+      - name: Upload Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.os }} # 例如: package-windows-latest
+          path: | # 包含所有可能的打包产物
+            *.deb
+            *.rpm
+            *.exe
+            *.zip
+            *.tar.gz
+            *.dmg
+          if-no-files-found: ignore
+
+  # ====================================================================
+  # JOB 2: 创建 GitHub Release 并上传所有产物
+  # ====================================================================
+  create_release:
+    name: Create GitHub Release
+    # 必须等待 build_and_package 这个 job 在所有平台都成功完成后再运行
+    needs: build_and_package 
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 此 job 需要写权限来创建 Release
+
+    steps:
+      # 1. 检出代码 (为了获取 CHANGELOG.md 等文件)
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+      
+      # 2. 生成版本 PDF (这部分逻辑保持不变)
+      - name: Install Pandoc and LaTeX
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc texlive-xetex fonts-noto
           sudo fc-cache -fv
-
-      # 步骤 3: 提取版本号并进行校验
-      - name: Extract and Verify Version
-        id: version_check
-        run: |
-          TAG_NAME=${{ github.ref_name }}
-          echo "Git Tag: ${TAG_NAME}"
-          
-          CMAKE_VERSION=$(grep -oP 'project\(.*?VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
-          echo "CMake Version: ${CMAKE_VERSION}"
-          if [ "${TAG_NAME#v}" != "$CMAKE_VERSION" ]; then
-            echo "::error::Version mismatch! Git tag is '${TAG_NAME}' but CMake version is '${CMAKE_VERSION}'."
-            exit 1
-          fi
-          
-          echo "version=${CMAKE_VERSION}" >> $GITHUB_OUTPUT
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
-
-      # 步骤 4: 准备并生成发布文档 (使用更完整的字体配置)
-      - name: Generate Release Documents
+      - name: Generate Release PDF
         run: |
           cp CHANGELOG.md version.md
-          echo "Created version.md"
-          
-          PDF_FILENAME="version-${{ steps.version_check.outputs.version }}.pdf"
-          
-          # -V sansfont: 明确指定无衬线字体，这比 mainfont 更适合 Markdown 的默认输出
-          pandoc version.md \
-            --pdf-engine=xelatex \
-            -V "sansfont:Noto Sans" \
-            -o "${PDF_FILENAME}"
-          
-          echo "Generated ${PDF_FILENAME}"
+          PDF_FILENAME="version-${{ github.ref_name }}.pdf"
+          pandoc version.md --pdf-engine=xelatex -V "sansfont:Noto Sans" -o "${PDF_FILENAME}"
+          echo "PDF_NAME=${PDF_FILENAME}" >> $GITHUB_ENV
+      
+      # 3. 从上一个 job 下载所有平台的安装包
+      # 这个 action 会自动下载所有名为 'package-*' 的 artifacts
+      - name: Download all package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist # 将所有包下载到 dist 目录下
+          pattern: package-* # 匹配所有以 package- 开头的 artifact
+          merge-multiple: true # 将所有 artifact 合并到一个目录
 
-      # 步骤 5: 创建 GitHub Release 并上传产物
-      - name: Create GitHub Release and Upload Artifacts
+      # 4. 创建最终的 GitHub Release
+      - name: Create GitHub Release and Upload All Assets
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.version_check.outputs.tag_name }}
+          # 使用 tag 作为 release 名称
+          tag_name: ${{ github.ref_name }}
+          # 从 CHANGELOG.md 读取发布说明
           body_path: CHANGELOG.md
+          # 上传所有我们准备好的文件！
           files: |
-            version.md
-            version-*.pdf
+            ${{ env.PDF_NAME }}
+            dist/*
