@@ -1,0 +1,102 @@
+# 工作流的名称，会显示在 GitHub 的 "Actions" 页面上
+name: Create Project Release
+
+# 1. 触发条件 (Event)
+# 只有当一个以 'v' 开头的 git 标签被推送到仓库时，这个工作流才会被触发
+on:
+  push:
+    tags:
+      - 'v*' # 匹配 v1.0, v1.2.3 等格式的标签
+
+# 2. 定义任务 (Jobs)
+jobs:
+  # 这是任务的唯一 ID，你可以自己命名，比如 build-and-release
+  create-release-assets:
+    # 任务的显示名称，更具可读性
+    name: Build, Document, and Release
+    
+    # 3. 指定运行器 (Runner)
+    # 这个任务将运行在最新版的 Ubuntu 虚拟机上
+    runs-on: ubuntu-latest
+
+    # 4. 为任务授予权限
+    # 这是非常重要的一步！为了让 Action 能够创建 Release 和上传文件，
+    # 你必须授予它对仓库内容的写权限。
+    permissions:
+      contents: write
+
+    # 5. 定义步骤 (Steps)
+    steps:
+      # 步骤 1: 检出代码
+      # 使用官方提供的 actions/checkout@v4 "动作"
+      # 这是所有操作的第一步，它会把你的仓库代码下载到 Runner 虚拟机上
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      # 步骤 2: 安装生成 PDF 所需的工具
+      # 'run' 关键字表示执行一段 shell 命令
+      - name: Install Pandoc and LaTeX for PDF generation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc texlive-latex-base lmodern
+
+      # 步骤 3: 提取版本号并进行校验
+      - name: Extract and Verify Version
+        # 'id' 使得这个步骤的输出可以被后续步骤引用
+        id: version_check
+        run: |
+          # 从触发工作流的 Git 引用 (ref) 中提取标签名，如 "refs/tags/v1.0.1" -> "v1.0.1"
+          TAG_NAME=${{ github.ref_name }}
+          echo "Git Tag: ${TAG_NAME}"
+          
+          # 从 CMakeLists.txt 中用正则表达式提取版本号
+          CMAKE_VERSION=$(grep -oP 'project\(.*?VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          echo "CMake Version: ${CMAKE_VERSION}"
+
+          # 校验版本是否一致 (v1.0.1 vs 1.0.1)
+          if [ "${TAG_NAME#v}" != "$CMAKE_VERSION" ]; then
+            echo "::error::Version mismatch! Git tag is '${TAG_NAME}' but CMake version is '${CMAKE_VERSION}'."
+            exit 1
+          fi
+          
+          # 将提取到的版本号设置为此步骤的输出，方便后续步骤使用
+          # 格式为 echo "变量名=值" >> $GITHUB_OUTPUT
+          echo "version=${CMAKE_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+
+      # 步骤 4: 准备并生成发布文档
+      - name: Generate Release Documents
+        run: |
+          # 复制 CHANGELOG.md 为 version.md
+          cp CHANGELOG.md version.md
+          echo "Created version.md"
+          
+          # 使用上一步的输出 (steps.version_check.outputs.version) 来命名 PDF
+          PDF_FILENAME="version-${{ steps.version_check.outputs.version }}.pdf"
+          
+          # 使用 pandoc 将 markdown 转换为 pdf
+          pandoc version.md -o "${PDF_FILENAME}"
+          echo "Generated ${PDF_FILENAME}"
+
+      # 步骤 5: 创建 GitHub Release 并上传产物
+      # 使用社区广受好评的 softprops/action-gh-release "动作"
+      - name: Create GitHub Release and Upload Artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          # Release 的标题，这里我们使用标签名，例如 "v1.0.1"
+          tag_name: ${{ steps.version_check.outputs.tag_name }}
+          
+          # 从 CHANGELOG.md 文件中提取发布说明
+          # 这个 action 很智能，它会找到与当前标签匹配的章节内容作为 Release 的描述
+          body_path: CHANGELOG.md
+          
+          # 指定要上传的文件。可以使用通配符 *
+          files: |
+            version.md
+            version-*.pdf
+
+          # 如果这是一个预发布版本 (例如 v1.0.0-beta)，可以设置为 true
+          # prerelease: false
+          
+          # 如果设置为 true, Release 会是草稿状态，需要你手动发布
+          # draft: false
