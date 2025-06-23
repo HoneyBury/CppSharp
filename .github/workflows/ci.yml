@@ -52,29 +52,31 @@ jobs:
       - name: Install dependencies with Conan
         run: conan install . --build=missing -s build_type=${{ matrix.build_type }}
 
-      # (!!!) NEW STEP: Set lowercase build type in a cross-platform way (!!!)
-      # This step generates a lowercase version of the build type and makes it available to other steps.
-      # This is the universal workaround for older GitHub Enterprise Servers that lack the toLower() function.
+      # (!!!) 最终修正步骤：以跨平台方式设置小写构建类型 (!!!)
+      # 这个步骤是解决问题的关键，它保证能在所有环境下正常工作。
       - name: Set lowercase build type
-        id: build_type_lc # Give this step an ID so we can reference its output
-        shell: bash # Explicitly use bash for consistent syntax
-        run: echo "value=${{ matrix.build_type,, }}" >> $GITHUB_OUTPUT
+        id: build_type_lc
+        shell: bash # 强制在所有平台 (包括Windows) 上使用 bash
+        run: |
+          # 1. 使用合法的 Actions 表达式将 matrix.build_type 的值赋给一个 shell 变量
+          TYPE_UC="${{ matrix.build_type }}"
+          # 2. 在 shell 内部，使用纯粹的 bash 语法将变量转为小写，并输出
+          echo "value=${TYPE_UC,,}" >> $GITHUB_OUTPUT
 
-      # 步骤 6: 使用 CMake Presets 配置项目 (MODIFIED)
-      # We now use the output from the previous step.
+      # 步骤 6: 使用 CMake Presets 配置项目 (使用修正后的输出)
       - name: Configure CMake
         run: cmake --preset conan-${{ steps.build_type_lc.outputs.value }} -DBUILD_TESTING=ON
 
-      # 步骤 7: 使用 CMake Presets 构建项目 (MODIFIED)
+      # 步骤 7: 使用 CMake Presets 构建项目 (使用修正后的输出)
       - name: Build project with CMake
         run: cmake --build --preset conan-${{ steps.build_type_lc.outputs.value }}
 
-      # 步骤 8: 运行单元测试 (仅在 Debug 模式下) (MODIFIED)
+      # 步骤 8: 运行单元测试 (仅在 Debug 模式下) (使用修正后的输出)
       - name: Run Unit Tests with CTest
         if: matrix.build_type == 'Debug'
         run: ctest --preset conan-${{ steps.build_type_lc.outputs.value }} --output-on-failure
 
-      # 步骤 9: 使用 CPack 创建安装包 (仅在 Release 模式下) - No change needed here
+      # 步骤 9: 使用 CPack 创建安装包 (仅在 Release 模式下)
       - name: Create package with CPack
         if: matrix.build_type == 'Release'
         run: cpack --preset conan-release
