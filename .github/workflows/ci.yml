@@ -75,10 +75,13 @@ jobs:
         if: matrix.build_type == 'Debug'
         run: ctest --preset conan-${{ steps.build_type_lc.outputs.value }} --output-on-failure
 
-      # 步骤 9: 使用 CPack 创建安装包 (仅在 Release 模式下)
+      # 步骤 9: 使用 CPack 创建安装包 (仅在 Release 模式下) (已修正)
       - name: Create package with CPack
         if: matrix.build_type == 'Release'
-        run: cpack --preset conan-release
+        # 我们不再使用 --preset，因为它不存在。
+        # 相反，我们使用标准的 -C <Config> 标志告诉 CPack 打包哪个配置。
+        # 这对于单配置（如Makefile）和多配置（如Visual Studio）生成器都有效。
+        run: cpack -C Release
 
       # 步骤 10: 上传构建产物 (安装包)
       - name: Upload Build Artifacts
@@ -86,6 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: myproject-package-${{ matrix.os }}
+          # 这个路径列表保持不变，它能很好地找到 CPack 生成的各种包文件
           path: |
             build/Release/
             build/
