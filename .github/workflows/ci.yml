@@ -19,16 +19,14 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      # 步骤 1: 检出代码
+      # 步骤 1-5 保持不变...
       - name: Checkout repository code
         uses: actions/checkout@v4
 
-      # 步骤 2: 安装 CPack 所需的打包工具 (仅在需要时)
       - name: Install CPack Generators
         if: matrix.build_type == 'Release' && runner.os == 'Windows'
         run: choco install nsis
 
-      # 步骤 3: 设置 Python 和 Conan 环境
       - name: Setup Python for Conan
         uses: actions/setup-python@v5
         with:
@@ -39,7 +37,6 @@ jobs:
           pip install conan
           conan profile detect --force
 
-      # 步骤 4: 缓存 Conan 包以加速构建
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:
@@ -48,43 +45,63 @@ jobs:
           restore-keys: |
             conan-${{ runner.os }}-${{ matrix.build_type }}-
 
-      # 步骤 5: 使用 Conan 安装依赖
       - name: Install dependencies with Conan
         run: conan install . --build=missing -s build_type=${{ matrix.build_type }}
 
-      # (!!!) 最终修正步骤：使用 tr 命令实现可移植的大小写转换 (!!!)
       - name: Set lowercase build type
         id: build_type_lc
-        run: |
-          # 使用 tr 命令，它在所有 Unix 系统中都可用，包括旧版 macOS 的 bash
-          # 将 matrix.build_type 的值通过管道传给 tr，tr 将所有大写字符 '[:upper:]' 转换为小写 '[:lower:]'
-          TYPE_LC=$(echo "${{ matrix.build_type }}" | tr '[:upper:]' '[:lower:]')
-          echo "value=$TYPE_LC" >> $GITHUB_OUTPUT
+        run: echo "value=$(echo "${{ matrix.build_type }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
         shell: bash
 
-      # 步骤 6: 使用 CMake Presets 配置项目 (使用修正后的输出)
+      # (!!!) 步骤 6: 平台感知的 CMake 配置 (!!!)
       - name: Configure CMake
-        run: cmake --preset conan-${{ steps.build_type_lc.outputs.value }} -DBUILD_TESTING=ON
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # Windows 使用 'conan-default' preset
+            cmake --preset conan-default -DBUILD_TESTING=ON
+          else
+            # Linux/macOS 使用 'conan-debug' 或 'conan-release'
+            cmake --preset conan-${{ steps.build_type_lc.outputs.value }} -DBUILD_TESTING=ON
+          fi
 
-      # 步骤 7: 使用 CMake Presets 构建项目 (使用修正后的输出)
+      # (!!!) 步骤 7: 平台感知的 CMake 构建 (!!!)
       - name: Build project with CMake
-        run: cmake --build --preset conan-${{ steps.build_type_lc.outputs.value }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # Windows (多配置) 必须在构建时通过 --config 指定配置
+            cmake --build --preset conan-default --config ${{ matrix.build_type }}
+          else
+            # Linux/macOS (单配置) 的配置已在 preset 中确定
+            cmake --build --preset conan-${{ steps.build_type_lc.outputs.value }}
+          fi
 
-      # 步骤 8: 运行单元测试 (仅在 Debug 模式下) (使用修正后的输出)
+      # (!!!) 步骤 8: 平台感知的单元测试 (!!!)
       - name: Run Unit Tests with CTest
         if: matrix.build_type == 'Debug'
-        run: ctest --preset conan-${{ steps.build_type_lc.outputs.value }} --output-on-failure
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # Windows CTest 同样需要 -C 来指定要测试的配置
+            ctest --preset conan-default -C Debug
+          else
+            ctest --preset conan-debug
+          fi
 
-      # 步骤 9: 使用 CPack 创建安装包 (仅在 Release 模式下) (最终修正版)
+      # (!!!) 步骤 9: 平台感知的打包 (!!!)
       - name: Create package with CPack
         if: matrix.build_type == 'Release'
-        # 这是最正确、最现代化的方法。我们不直接调用 cpack。
-        # 相反，我们让 CMake 去构建一个由 CPack 模块自动创建的特殊目标："package"。
-        # 这个命令利用了我们已经成功使用的 'conan-release' 构建预设，
-        # CMake 会自动处理所有的路径和配置问题。
-        run: cmake --build --preset conan-release --target package
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # Windows 打包也需要指定配置
+            cmake --build --preset conan-default --config Release --target package
+          else
+            cmake --build --preset conan-release --target package
+          fi
 
-      # 步骤 10: 上传构建产物 (安装包) - 无需改动
+      # 步骤 10: 上传产物 - 无需改动
       - name: Upload Build Artifacts
         if: matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
