@@ -78,17 +78,11 @@ jobs:
       # 步骤 9: 使用 CPack 创建安装包 (仅在 Release 模式下) (最终修正版)
       - name: Create package with CPack
         if: matrix.build_type == 'Release'
-        run: |
-          # 这是解决问题的关键：我们必须告诉 cpack 构建目录在哪里，
-          # 因为 cpack 的配置文件 (CPackConfig.cmake) 在那个目录里。
-          # Windows (多配置生成器) 的构建目录是 'build'。
-          # Linux/macOS (单配置生成器) 的构建目录是 'build/Release'。
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            cpack -B build -C Release
-          else
-            cpack -B build/Release -C Release
-          fi
-        shell: bash
+        # 这是最正确、最现代化的方法。我们不直接调用 cpack。
+        # 相反，我们让 CMake 去构建一个由 CPack 模块自动创建的特殊目标："package"。
+        # 这个命令利用了我们已经成功使用的 'conan-release' 构建预设，
+        # CMake 会自动处理所有的路径和配置问题。
+        run: cmake --build --preset conan-release --target package
 
       # 步骤 10: 上传构建产物 (安装包) - 无需改动
       - name: Upload Build Artifacts
