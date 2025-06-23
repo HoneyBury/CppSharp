@@ -45,50 +45,82 @@ if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
-# =================== 新增：安装与打包配置 ===================
+# =================== 新增：安装与打包配置 (最终修正版) ===================
 # 1. 包含CMake的打包和安装辅助模块
 include(CMakePackageConfigHelpers)
 include(CPack)
-# 在 include(CPack) 之后添加
-set(CPACK_GENERATOR "NSIS") # Windows
-set(CPACK_GENERATOR "DEB")  # Debian/Ubuntu
-set(CPACK_GENERATOR "RPM")  # Fedora/CentOS
+
+# 2. 根据操作系统，条件性地设置 CPack 生成器
+if(WIN32)
+  # 在 Windows 上，使用 NSIS 创建 .exe 安装程序
+  set(CPACK_GENERATOR "NSIS")
+elseif(UNIX AND NOT APPLE)
+  # 在 Linux (GitHub Actions 的 runner 是基于 Debian/Ubuntu 的) 上，创建 .deb 包
+  set(CPACK_GENERATOR "DEB")
+elseif(APPLE)
+  # 在 macOS 上，创建用户友好的 .dmg 拖拽安装包
+  set(CPACK_GENERATOR "DragNDrop")
+endif()
+
+# 3. 设置通用的包元数据 (强烈推荐)
+set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+set(CPACK_PACKAGE_VENDOR "MyProject Inc.")
+set(CPACK_PACKAGE_CONTACT "${PROJECT_AUTHOR}")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE") # 假设你有一个LICENSE文件
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md") # 假设你有一个README.md
+
+# 4. 设置 DEB 包的特定元数据 (可选，但推荐)
+if(CPACK_GENERATOR STREQUAL "DEB")
+  set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${PROJECT_AUTHOR}")
+  set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+  set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+endif()
+
+# 5. 设置 NSIS 安装程序的特定元数据 (可选)
+if(CPACK_GENERATOR STREQUAL "NSIS")
+  set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_NAME} ${CPACK_PACKAGE_VERSION}")
+  set(CPACK_NSIS_PUBLISHER "${CPACK_PACKAGE_VENDOR}")
+  set(CPACK_NSIS_URL_INFO_ABOUT "${PROJECT_URL}")
+endif()
+
+# 6. 设置源文件打包时要忽略的文件
 set(CPACK_SOURCE_IGNORE_FILES
-        "/.git/"
-        "/build/"
-        "/.vscode/"
-        "/.idea/"
-        ".DS_Store"
-        "*.swp"
-        "*.bak"
+    "/.git/"
+    "/build/"
+    "/.vscode/"
+    "/.idea/"
+    ".DS_Store"
+    "*.swp"
+    "*.bak"
 )
 
-# 2. 生成 MyProjectConfigVersion.cmake 文件
-#    这允许其他项目在find_package时指定版本，例如 find_package(MyProject 1.0.0 EXACT)
+# 7. 生成 MyProjectConfigVersion.cmake 文件
 write_basic_package_version_file(
-        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-        VERSION ${PROJECT_VERSION}
-        COMPATIBILITY AnyNewerVersion
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
 )
 
-# 3. 配置并生成 MyProjectConfig.cmake 文件
-#    这是find_package的核心
+# 8. 配置并生成 MyProjectConfig.cmake 文件
 configure_package_config_file(
-        "${PROJECT_SOURCE_DIR}/cmake/config.cmake.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
-)
-# 4. 将生成的配置文件安装到指定位置
-install(FILES
-"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+    "${PROJECT_SOURCE_DIR}/cmake/config.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
-# 5. 安装由我们导出的目标文件 (MyProjectTargets.cmake)
-install(EXPORT ${PROJECT_NAME}Targets
-FILE ${PROJECT_NAME}Targets.cmake
-NAMESPACE ${PROJECT_NAME}::
-DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+# 9. 将生成的配置文件安装到指定位置
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
-# ==========================================================
+
+# 10. 安装由我们导出的目标文件 (MyProjectTargets.cmake)
+install(EXPORT ${PROJECT_NAME}Targets
+    FILE ${PROJECT_NAME}Targets.cmake
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+)
+# ==========================================================================
