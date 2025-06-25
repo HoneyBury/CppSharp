@@ -1,4 +1,4 @@
-# .github/workflows/release.yml (最终整合版)
+# .github/workflows/release.yml (修正版)
 
 name: Create Project Release
 
@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-    
+
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read # 此 job 只需读取代码
@@ -63,21 +63,33 @@ jobs:
             cmake --preset conan-release -DBUILD_TESTING=OFF
           fi
 
-      # 7. 构建项目
+      # 7. 构建项目 (!!! 修正点 1 !!!)
       - name: Build project
-        run: cmake --build --preset conan-release
+        # 确保构建时使用的 preset 和配置时一致
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            cmake --build --preset conan-default
+          else
+            cmake --build --preset conan-release
+          fi
 
-      # 8. 打包项目
+      # 8. 打包项目 (!!! 修正点 2 !!!)
       - name: Create package with CPack
-        run: cmake --build --preset conan-release --target package
-      
-      # (!!!) 步骤 9: 精准上传最终的安装包 (!!!)
+        # 确保打包时使用的 preset 和配置时一致
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            cmake --build --preset conan-default --target package
+          else
+            cmake --build --preset conan-release --target package
+          fi
+
+      # 9. 精准上传最终的安装包
       - name: Upload Package Artifact
         uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.os }}
-          # 这是关键修正！我们只上传特定扩展名的文件，并递归搜索 build 目录。
-          # 这将确保只上传 .exe, .deb, .dmg 等最终产物，忽略所有中间文件。
           path: |
             build/**/*.deb
             build/**/*.rpm
@@ -92,18 +104,17 @@ jobs:
   # ====================================================================
   create_release:
     name: Create GitHub Release
-    # 必须等待 build_and_package 这个 job 在所有平台都成功完成后再运行
-    needs: build_and_package 
+    needs: build_and_package
     runs-on: ubuntu-latest
     permissions:
       contents: write # 此 job 需要写权限来创建 Release
 
     steps:
-      # 1. 检出代码 (为了获取 CHANGELOG.md 等文件)
+      # 1. 检出代码
       - name: Checkout repository code
         uses: actions/checkout@v4
-      
-      # 2. 生成版本 PDF (这部分逻辑保持不变)
+
+      # 2. 生成版本 PDF
       - name: Install Pandoc and LaTeX
         run: |
           sudo apt-get update
@@ -117,7 +128,6 @@ jobs:
           echo "PDF_NAME=${PDF_FILENAME}" >> $GITHUB_ENV
       
       # 3. 从上一个 job 下载所有平台的安装包
-      # 这个 action 会自动下载所有名为 'package-*' 的 artifacts
       - name: Download all package artifacts
         uses: actions/download-artifact@v4
         with:
@@ -129,11 +139,8 @@ jobs:
       - name: Create GitHub Release and Upload All Assets
         uses: softprops/action-gh-release@v1
         with:
-          # 使用 tag 作为 release 名称
           tag_name: ${{ github.ref_name }}
-          # 从 CHANGELOG.md 读取发布说明
           body_path: CHANGELOG.md
-          # 上传所有我们准备好的文件！
           files: |
             ${{ env.PDF_NAME }}
             dist/*

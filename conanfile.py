@@ -13,9 +13,9 @@ class MyProjectConan(ConanFile):
     name = "myproject"
     version = "2.0.0"
     license = "MIT"
-    author = "Your Name <you@example.com>"
-    url = "https://github.com/your-repo/myproject"
-    description = "A modern C++ project template using Conan and CMake."
+    author = "HoneyBury zoujiahe389@gmail.com"
+    url = "https://github.com/HoneyBury/CppSharp.git"
+    description = "A modern C++ project template using Conan and CMake and GitHub Action."
     topics = ("cpp", "cmake", "conan", "template", "scaffolding")
 
     # 2. Binary Configuration
