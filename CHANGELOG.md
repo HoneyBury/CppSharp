@@ -1,17 +1,66 @@
-# Changelog
+# 更新日志 (Changelog)
 
-All notable changes to this project will be documented in this file.
+本项目的所有显著变化将记录在此文件中。
 
-## [v1.0.1] - 2023-10-27
+该文件格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，
+并遵循 [语义化版本](https://semver.org/spec/v2.0.0.html) (Semantic Versioning)。
 
-### ✨ Features
-- Implemented a new high-performance algorithm.
+---
 
-### 🐛 Bug Fixes
-- Fixed a memory leak in the data processing module (Issue #42).
+## [Unreleased] - 未发布
 
-## [v1.0.0] - 2023-10-20
+### 新增 (Added)
+- 在开发分支中新增的功能点。
 
-### 🎉 Initial Release
-- Core functionalities.
-- Basic project setup with CMake and Conan.
+### 变更 (Changed)
+- 对现有功能的修改。
+
+### 修复 (Fixed)
+- 修复的 Bug。
+
+---
+
+## [1.1.0] - 2023-10-27
+
+### 新增 (Added)
+- 用户个人资料页面，允许用户查看和编辑自己的信息。
+- 全局搜索功能，支持模糊匹配文章标题和内容。
+
+### 变更 (Changed)
+- **[重要]** 将 API 认证方式从 Cookie-based 改为 JWT (JSON Web Token)。
+- 优化了首页文章列表的加载速度，采用懒加载技术。
+
+### 修复 (Fixed)
+- 修复了在 Safari 浏览器下评论区样式错乱的问题 (#123)。
+- 解决了特定条件下上传图片失败的 Bug。
+
+---
+
+## [1.0.1] - 2023-09-15
+
+### 修复 (Fixed)
+- 修复了用户注册时，密码强度验证规则过于简单的问题。
+- 修正了文档中的一个拼写错误。
+
+---
+
+## [1.0.0] - 2023-09-01
+
+### 新增 (Added)
+- 项目初始版本发布！
+- 核心功能：用户注册、登录、发布文章、评论。
+- 基础的文章管理后台。
+
+---
+<!--
+### 可选的变更类型标签 (Optional Change Types)
+
+### 弃用 (Deprecated)
+- 即将被移除的旧功能。
+
+### 移除 (Removed)
+- 在此版本中被移除的功能。
+
+### 安全 (Security)
+- 修复的安全漏洞。
+-->

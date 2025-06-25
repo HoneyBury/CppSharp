@@ -9,6 +9,7 @@
 -   Conan 2.0 依赖管理
 -   Google Test 集成
 -   清晰的项目结构
+-   Github Action CI/CD 集成
 
 ## 依赖
 
@@ -20,8 +21,8 @@
 
 1.  **克隆仓库**
     ```bash
-    git clone <your-repo-url>
-    cd my-project
+    git clone https://github.com/HoneyBury/CppSharp.git
+    cd CppSharp
     ```
 
 2.  **安装Conan依赖**
@@ -36,10 +37,10 @@
     使用Conan生成的toolchain文件来配置CMake。
     ```bash
     # Configure for Release
-    cmake -S . -B build/release -DCMAKE_TOOLCHAIN_FILE="build/release/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
+    cmake -S . -B build/release -DCMAKE_TOOLCHAIN_FILE="build/generators/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
 
     # Configure for Debug
-    cmake -S . -B build/debug -DCMAKE_TOOLCHAIN_FILE="build/debug/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Debug
+    cmake -S . -B build/debug -DCMAKE_TOOLCHAIN_FILE="build/generators/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Debug
     ```
 
 4.  **构建项目**
