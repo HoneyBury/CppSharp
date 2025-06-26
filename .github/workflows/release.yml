@@ -1,4 +1,4 @@
-# .github/workflows/release.yml (最终正确版)
+# .github/workflows/release.yml (最终、绝对正确的版本)
 
 name: Create Project Release
 
@@ -43,40 +43,20 @@ jobs:
       - name: Install dependencies for Release
         run: conan install . --build=missing -s build_type=Release
 
-      # 6. 平台感知的 CMake 配置 (!!! 修正点 1 !!!)
       - name: Configure CMake
         shell: bash
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
-            # 在 Windows (多配置) 上，Conan 生成 'conan-default' preset
             cmake --preset conan-default -DBUILD_TESTING=OFF
           else
-            # 在 Linux/macOS (单配置) 上，Conan 生成 'conan-release' preset
             cmake --preset conan-release -DBUILD_TESTING=OFF
           fi
 
-      # 7. 构建项目 (!!! 修正点 2 !!!)
       - name: Build project
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            # 在 Windows 上，必须在构建时通过 --config 指定配置
-            cmake --build --preset conan-default --config Release
-          else
-            # 在其他系统上，配置已包含在 preset 中
-            cmake --build --preset conan-release
-          fi
+        run: cmake --build --preset conan-release
 
-      # 8. 打包项目 (!!! 修正点 3 !!!)
       - name: Create package with CPack
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            # 打包时同样需要指定 --config
-            cmake --build --preset conan-default --config Release --target package
-          else
-            cmake --build --preset conan-release --target package
-          fi
+        run: cmake --build --preset conan-release --target package
 
       - name: Upload Package Artifact
         uses: actions/upload-artifact@v4
@@ -113,13 +93,17 @@ jobs:
           PDF_FILENAME="version-${{ github.ref_name }}.pdf"
           pandoc version.md --pdf-engine=xelatex -V "sansfont:Noto Sans" -o "${PDF_FILENAME}"
           echo "PDF_NAME=${PDF_FILENAME}" >> $GITHUB_ENV
-
+      
       - name: Download all package artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
           pattern: package-*
           merge-multiple: true
+
+      # 可选的调试步骤，用于查看下载后的文件结构
+      - name: Display structure of downloaded files
+        run: ls -R dist
 
       - name: Create GitHub Release and Upload All Assets
         uses: softprops/action-gh-release@v1
@@ -128,4 +112,4 @@ jobs:
           body_path: CHANGELOG.md
           files: |
             ${{ env.PDF_NAME }}
-            dist/*
+            dist/**/*
