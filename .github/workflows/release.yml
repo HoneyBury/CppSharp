@@ -1,4 +1,4 @@
-# .github/workflows/release.yml (最终、简化和正确的版本)
+# .github/workflows/release.yml (最终、基于验证逻辑的正确版本)
 
 name: Create Project Release
 
@@ -41,21 +41,33 @@ jobs:
             conan-${{ runner.os }}-Release-
 
       - name: Install dependencies for Release
+        # 我们只构建 Release 版本，所以 build_type 是固定的
         run: conan install . --build=missing -s build_type=Release
 
       # ====================================================================
-      # !!! 核心修正：移除所有平台判断，统一使用 conan-release !!!
+      # !!! 核心修正：应用从 ci.yml 学到的正确逻辑 !!!
       # ====================================================================
 
-      # 6. CMake 配置
+      # 6. 平台感知的 CMake 配置 (!!! 修正点 1 !!!)
+      # 配置预设 (configurePreset) 在 Windows 和其他平台是不同的。
       - name: Configure CMake
-        run: cmake --preset conan-release -DBUILD_TESTING=OFF
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # 在 Windows 上，Conan 只生成 'conan-default' 配置预设
+            cmake --preset conan-default -DBUILD_TESTING=OFF
+          else
+            # 在 Linux/macOS 上，配置预设与构建类型同名
+            cmake --preset conan-release -DBUILD_TESTING=OFF
+          fi
 
-      # 7. 构建项目
+      # 7. 统一的 CMake 构建 (!!! 修正点 2 !!!)
+      # 构建预设 (buildPreset) 在所有平台上都是 'conan-release'。
       - name: Build project
         run: cmake --build --preset conan-release
 
-      # 8. 打包项目
+      # 8. 统一的打包 (!!! 修正点 3 !!!)
+      # 打包也使用统一的 'conan-release' 构建预设。
       - name: Create package with CPack
         run: cmake --build --preset conan-release --target package
 
