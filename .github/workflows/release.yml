@@ -1,46 +1,37 @@
-# .github/workflows/release.yml (最终修正版)
+# .github/workflows/release.yml (最终正确版)
 
 name: Create Project Release
 
-# 触发条件：当一个以 'v' 开头的 tag 被推送到仓库时
 on:
   push:
     tags:
       - 'v*'
 
 jobs:
-  # ====================================================================
-  # JOB 1: 在所有平台上构建和打包项目
-  # ====================================================================
   build_and_package:
     name: Build & Package on ${{ matrix.os }}
-    # 使用矩阵在所有目标平台上运行
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
     permissions:
-      contents: read # 此 job 只需读取代码
+      contents: read
 
     steps:
-      # 1. 检出代码
       - name: Checkout repository code
         uses: actions/checkout@v4
 
-      # 2. 安装 CPack 所需的打包工具 (仅在 Windows 上需要)
       - name: Install CPack Generators
         if: runner.os == 'Windows'
         run: choco install nsis
 
-      # 3. 安装 Python 和 Conan
       - name: Setup Python and Conan
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: pip install conan && conan profile detect --force
 
-      # 4. 缓存 Conan 包
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:
@@ -49,26 +40,44 @@ jobs:
           restore-keys: |
             conan-${{ runner.os }}-Release-
 
-      # 5. 安装依赖 (只针对 Release 配置)
       - name: Install dependencies for Release
         run: conan install . --build=missing -s build_type=Release
 
-      # 6. CMake 配置 (!!! 修正点 1 !!!)
+      # 6. 平台感知的 CMake 配置 (!!! 修正点 1 !!!)
       - name: Configure CMake
-        # 移除平台判断，统一使用 conan-release preset
-        run: cmake --preset conan-release -DBUILD_TESTING=OFF
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # 在 Windows (多配置) 上，Conan 生成 'conan-default' preset
+            cmake --preset conan-default -DBUILD_TESTING=OFF
+          else
+            # 在 Linux/macOS (单配置) 上，Conan 生成 'conan-release' preset
+            cmake --preset conan-release -DBUILD_TESTING=OFF
+          fi
 
       # 7. 构建项目 (!!! 修正点 2 !!!)
       - name: Build project
-        # 移除平台判断，统一使用 conan-release preset
-        run: cmake --build --preset conan-release
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # 在 Windows 上，必须在构建时通过 --config 指定配置
+            cmake --build --preset conan-default --config Release
+          else
+            # 在其他系统上，配置已包含在 preset 中
+            cmake --build --preset conan-release
+          fi
 
       # 8. 打包项目 (!!! 修正点 3 !!!)
       - name: Create package with CPack
-        # 移除平台判断，统一使用 conan-release preset
-        run: cmake --build --preset conan-release --target package
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # 打包时同样需要指定 --config
+            cmake --build --preset conan-default --config Release --target package
+          else
+            cmake --build --preset conan-release --target package
+          fi
 
-      # 9. 精准上传最终的安装包
       - name: Upload Package Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -80,24 +89,19 @@ jobs:
             build/**/*.zip
             build/**/*.tar.gz
             build/**/*.dmg
-          if-no-files-found: error # 找不到文件就报错，确保打包成功
+          if-no-files-found: error
 
-  # ====================================================================
-  # JOB 2: 创建 GitHub Release 并上传所有产物
-  # ====================================================================
   create_release:
     name: Create GitHub Release
     needs: build_and_package
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 此 job 需要写权限来创建 Release
+      contents: write
 
     steps:
-      # 1. 检出代码
       - name: Checkout repository code
         uses: actions/checkout@v4
 
-      # 2. 生成版本 PDF
       - name: Install Pandoc and LaTeX
         run: |
           sudo apt-get update
@@ -109,16 +113,14 @@ jobs:
           PDF_FILENAME="version-${{ github.ref_name }}.pdf"
           pandoc version.md --pdf-engine=xelatex -V "sansfont:Noto Sans" -o "${PDF_FILENAME}"
           echo "PDF_NAME=${PDF_FILENAME}" >> $GITHUB_ENV
-      
-      # 3. 从上一个 job 下载所有平台的安装包
+
       - name: Download all package artifacts
         uses: actions/download-artifact@v4
         with:
-          path: dist # 将所有包下载到 dist 目录下
-          pattern: package-* # 匹配所有以 package- 开头的 artifact
-          merge-multiple: true # 将所有 artifact 合并到一个目录
+          path: dist
+          pattern: package-*
+          merge-multiple: true
 
-      # 4. 创建最终的 GitHub Release
       - name: Create GitHub Release and Upload All Assets
         uses: softprops/action-gh-release@v1
         with:
