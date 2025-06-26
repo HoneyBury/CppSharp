@@ -1,4 +1,4 @@
-# .github/workflows/release.yml (最终、通用、健壮的版本)
+# .github/workflows/release.yml (最终、完美、通用的版本)
 
 name: Create Project Release
 
@@ -53,28 +53,23 @@ jobs:
         run: cmake --build --preset conan-release --target package
 
       # ====================================================================
-      # !!! 核心修正：通用、精确、安全的“暂存”步骤 !!!
+      # !!! 最终的核心修正：精确查找安装包，忽略编译产物 !!!
       # ====================================================================
 
       - name: Stage Artifact
         shell: bash
         run: |
-          # 1. 创建一个干净的暂存目录
           mkdir staging
           
-          # 2. 定义一个查找命令，它：
-          #    a) 忽略 CPack 的内部工作目录 (-prune)
-          #    b) 查找通用的扩展名 (*.exe, *.deb 等)
-          #    c) 只取第一个结果 (head -n 1)，杜绝多文件错误
+          # 在 Windows 上，使用更精确的模式 '*-*.*.exe' 来区分安装包和普通 exe
           if [ "$RUNNER_OS" == "Windows" ]; then
-            PACKAGE_FILE=$(find build -path '*/_CPack_Packages' -prune -o -name "*.exe" -print | head -n 1)
+            PACKAGE_FILE=$(find build -path '*/_CPack_Packages' -prune -o -name "*-*.*.exe" -print | head -n 1)
           elif [ "$RUNNER_OS" == "Linux" ]; then
             PACKAGE_FILE=$(find build -path '*/_CPack_Packages' -prune -o -name "*.deb" -print -o -name "*.tar.gz" -print | head -n 1)
           elif [ "$RUNNER_OS" == "macOS" ]; then
             PACKAGE_FILE=$(find build -path '*/_CPack_Packages' -prune -o -name "*.dmg" -print -o -name "*.tar.gz" -print | head -n 1)
           fi
           
-          # 3. 严格检查是否找到了文件
           if [ -z "$PACKAGE_FILE" ]; then
             echo "::error::Could not find the final package file!"
             echo "Listing all build directory contents for debugging:"
@@ -82,7 +77,6 @@ jobs:
             exit 1
           fi
           
-          # 4. 将找到的那个唯一的文件移动到暂存目录
           echo "Found final package: $PACKAGE_FILE"
           echo "Moving to staging directory..."
           mv "$PACKAGE_FILE" staging/
