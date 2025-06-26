@@ -1,4 +1,4 @@
-# .github/workflows/release.yml (最终、完美版)
+# .github/workflows/release.yml (最终、带诊断功能的完美版)
 
 name: Create Project Release
 
@@ -19,19 +19,17 @@ jobs:
       contents: read
 
     steps:
+      # 步骤 1-8 保持不变
       - name: Checkout repository code
         uses: actions/checkout@v4
-
       - name: Install CPack Generators
         if: runner.os == 'Windows'
         run: choco install nsis
-
       - name: Setup Python and Conan
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: pip install conan && conan profile detect --force
-
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:
@@ -39,10 +37,8 @@ jobs:
           key: conan-${{ runner.os }}-Release-${{ hashFiles('**/conanfile.py') }}
           restore-keys: |
             conan-${{ runner.os }}-Release-
-
       - name: Install dependencies for Release
         run: conan install . --build=missing -s build_type=Release
-
       - name: Configure CMake
         shell: bash
         run: |
@@ -51,38 +47,42 @@ jobs:
           else
             cmake --preset conan-release -DBUILD_TESTING=OFF
           fi
-
       - name: Build project
         run: cmake --build --preset conan-release
-
       - name: Create package with CPack
         run: cmake --build --preset conan-release --target package
 
+      # (!!!) 关键的调试步骤 (!!!)
+      # 在上传前，递归列出 build 目录的所有内容，以便我们确切知道文件在哪里
+      - name: List build directory contents
+        run: ls -R build
+        shell: bash
+
+      # (!!!) 最终的、正确的上传步骤 (!!!)
       - name: Upload Package Artifact
         uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.os }}
-          # 精准定位 CPack 生成的最终包，避免上传中间产物
+          # 使用递归查找 `**` 和精确的文件名 `Project-*` 来定位最终的包
           path: |
-            build/Project-*.deb
-            build/Project-*.rpm
-            build/Project-*.exe
-            build/Project-*.zip
-            build/Project-*.tar.gz
-            build/Project-*.dmg
+            build/**/Project-*.deb
+            build/**/Project-*.rpm
+            build/**/Project-*.exe
+            build/**/Project-*.zip
+            build/**/Project-*.tar.gz
+            build/**/Project-*.dmg
           if-no-files-found: error
 
   create_release:
+    # ... create_release job 保持不变 ...
     name: Create GitHub Release
     needs: build_and_package
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - name: Checkout repository code
         uses: actions/checkout@v4
-
       - name: Install Pandoc and LaTeX
         run: |
           sudo apt-get update
@@ -94,17 +94,14 @@ jobs:
           PDF_FILENAME="version-${{ github.ref_name }}.pdf"
           pandoc version.md --pdf-engine=xelatex -V "sansfont:Noto Sans" -o "${PDF_FILENAME}"
           echo "PDF_NAME=${PDF_FILENAME}" >> $GITHUB_ENV
-      
       - name: Download all package artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
           pattern: package-*
           merge-multiple: true
-
       - name: Display structure of downloaded files
         run: ls -R dist
-
       - name: Create GitHub Release and Upload All Assets
         uses: softprops/action-gh-release@v1
         with:
