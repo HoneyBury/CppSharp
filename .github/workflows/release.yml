@@ -1,4 +1,4 @@
-# .github/workflows/release.yml (最终、绝对正确的版本)
+# .github/workflows/release.yml (最终、完美版)
 
 name: Create Project Release
 
@@ -62,13 +62,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.os }}
+          # 精准定位 CPack 生成的最终包，避免上传中间产物
           path: |
-            build/**/*.deb
-            build/**/*.rpm
-            build/**/*.exe
-            build/**/*.zip
-            build/**/*.tar.gz
-            build/**/*.dmg
+            build/Project-*.deb
+            build/Project-*.rpm
+            build/Project-*.exe
+            build/Project-*.zip
+            build/Project-*.tar.gz
+            build/Project-*.dmg
           if-no-files-found: error
 
   create_release:
@@ -101,7 +102,6 @@ jobs:
           pattern: package-*
           merge-multiple: true
 
-      # 可选的调试步骤，用于查看下载后的文件结构
       - name: Display structure of downloaded files
         run: ls -R dist
 

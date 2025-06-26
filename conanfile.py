@@ -11,7 +11,7 @@ class MyProjectConan(ConanFile):
 
     # 1. Package Metadata
     name = "myproject"
-    version = "2.0.4"
+    version = "2.0.5"
     license = "MIT"
     author = "HoneyBury zoujiahe389@gmail.com"
     url = "https://github.com/HoneyBury/CppSharp.git"
