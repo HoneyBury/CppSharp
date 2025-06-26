@@ -1,4 +1,4 @@
-# .github/workflows/release.yml (最终、健壮、简单的版本)
+# .github/workflows/release.yml (最终、语法正确、逻辑健壮的版本)
 
 name: Create Project Release
 
@@ -19,17 +19,19 @@ jobs:
       contents: read
 
     steps:
-      # 步骤 1-8: 保持不变，它们是正确的
       - name: Checkout repository code
         uses: actions/checkout@v4
+
       - name: Install CPack Generators
         if: runner.os == 'Windows'
         run: choco install nsis
+
       - name: Setup Python and Conan
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: pip install conan && conan profile detect --force
+
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:
@@ -37,8 +39,10 @@ jobs:
           key: conan-${{ runner.os }}-Release-${{ hashFiles('**/conanfile.py') }}
           restore-keys: |
             conan-${{ runner.os }}-Release-
+
       - name: Install dependencies for Release
         run: conan install . --build=missing -s build_type=Release
+
       - name: Configure CMake
         shell: bash
         run: |
@@ -47,49 +51,36 @@ jobs:
           else
             cmake --preset conan-release -DBUILD_TESTING=OFF
           fi
+
       - name: Build project
         run: cmake --build --preset conan-release
+
       - name: Create package with CPack
         run: cmake --build --preset conan-release --target package
 
-      # ====================================================================
-      # !!! 核心修正：引入一个干净的“暂存”步骤，消除所有不确定性 !!!
-      # ====================================================================
-
-      # 步骤 9: 将最终产物移动到干净的暂存目录
       - name: Stage Artifact
         shell: bash
         run: |
-          # 1. 创建一个干净的暂存目录
           mkdir staging
-          
-          # 2. 根据操作系统，找到那个唯一的最终安装包
           if [ "$RUNNER_OS" == "Windows" ]; then
             PACKAGE_FILE=$(find build -name "Project-*.exe" -type f)
           elif [ "$RUNNER_OS" == "Linux" ]; then
-            # 优先找 .deb, 其次找 .tar.gz
             PACKAGE_FILE=$(find build -name "Project-*.deb" -o -name "Project-*.tar.gz" -type f)
           elif [ "$RUNNER_OS" == "macOS" ]; then
             PACKAGE_FILE=$(find build -name "Project-*.dmg" -o -name "Project-*.tar.gz" -type f)
           fi
-          
-          # 3. 检查是否找到了文件
           if [ -z "$PACKAGE_FILE" ]; then
             echo "::error::Could not find the package file!"
             ls -R build
             exit 1
           fi
-          
-          # 4. 将找到的文件移动到暂存目录
           echo "Staging file: $PACKAGE_FILE"
           mv "$PACKAGE_FILE" staging/
 
-      # 步骤 10: 从干净的暂存目录上传产物
       - name: Upload Package Artifact
         uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.os }}
-          # 路径现在极其简单和可靠
           path: staging/
 
   create_release:
@@ -99,13 +90,24 @@ jobs:
     permissions:
       contents: write
     steps:
-      # 步骤 1-3: 保持不变
       - name: Checkout repository code
         uses: actions/checkout@v4
+
+      # (!!!) 修正点：填补了之前省略的 run 命令 (!!!)
       - name: Install Pandoc and LaTeX
-        # ... (省略)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc texlive-xetex fonts-noto
+          sudo fc-cache -fv
+
+      # (!!!) 修正点：填补了之前省略的 run 命令 (!!!)
       - name: Generate Release PDF
-        # ... (省略)
+        run: |
+          cp CHANGELOG.md version.md
+          PDF_FILENAME="version-${{ github.ref_name }}.pdf"
+          pandoc version.md --pdf-engine=xelatex -V "sansfont:Noto Sans" -o "${PDF_FILENAME}"
+          echo "PDF_NAME=${PDF_FILENAME}" >> $GITHUB_ENV
+
       - name: Download all package artifacts
         uses: actions/download-artifact@v4
         with:
@@ -113,17 +115,14 @@ jobs:
           pattern: package-*
           merge-multiple: true
 
-      # 步骤 4: 调试，确认下载后的目录是干净的
       - name: Display structure of downloaded files
         run: ls -R dist
 
-      # 步骤 5: 创建 Release，现在它处理的是一个干净、无重复的文件列表
       - name: Create GitHub Release and Upload All Assets
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           body_path: CHANGELOG.md
-          # dist/* 现在是可靠的，因为我们确保了源头是干净的
           files: |
             ${{ env.PDF_NAME }}
             dist/*

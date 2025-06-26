@@ -36,6 +36,13 @@
 3.  **配置CMake项目**
     使用Conan生成的toolchain文件来配置CMake。
     ```bash
+    # 可以使用预设的命令方式
+    
+    # windows平台下
+    cmake --preset conan-default -DBUILD_TESTING=OFF
+    # linux/mac平台下
+    cmake --preset conan-debug -DBUILD_TESTING=OFF
+    
     # Configure for Release
     cmake -S . -B build/release -DCMAKE_TOOLCHAIN_FILE="build/generators/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
 
@@ -45,6 +52,11 @@
 
 4.  **构建项目**
     ```bash
+    
+    # 同样有预设的方式 这里平台是统一的
+    cmake --build --preset conan-debug
+    cmake --build --preset conan-release
+    
     # Build Release
     cmake --build build/release
 
@@ -56,9 +68,19 @@
     ```bash
     # Run application
     ./build/release/bin/app
-
+    
+    # 如果使用预设的方式windows平台会不太一样
+    ./build/bin/app
+    
     # Run tests
     cd build/release
     ctest -C Release --output-on-failure
     cd ../..
     ```
+6. **打包**
+    ```bash
+     cmake --build --preset conan-debug --target package
+   # 或者可以使用cpack安装
+   
+   ```
+    
