@@ -1,4 +1,4 @@
-# .github/workflows/release.yml (修正版)
+# .github/workflows/release.yml (最终修正版)
 
 name: Create Project Release
 
@@ -53,37 +53,20 @@ jobs:
       - name: Install dependencies for Release
         run: conan install . --build=missing -s build_type=Release
 
-      # 6. 平台感知的 CMake 配置
+      # 6. CMake 配置 (!!! 修正点 1 !!!)
       - name: Configure CMake
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            cmake --preset conan-default -DBUILD_TESTING=OFF
-          else
-            cmake --preset conan-release -DBUILD_TESTING=OFF
-          fi
+        # 移除平台判断，统一使用 conan-release preset
+        run: cmake --preset conan-release -DBUILD_TESTING=OFF
 
-      # 7. 构建项目 (!!! 修正点 1 !!!)
+      # 7. 构建项目 (!!! 修正点 2 !!!)
       - name: Build project
-        # 确保构建时使用的 preset 和配置时一致
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            cmake --build --preset conan-default
-          else
-            cmake --build --preset conan-release
-          fi
+        # 移除平台判断，统一使用 conan-release preset
+        run: cmake --build --preset conan-release
 
-      # 8. 打包项目 (!!! 修正点 2 !!!)
+      # 8. 打包项目 (!!! 修正点 3 !!!)
       - name: Create package with CPack
-        # 确保打包时使用的 preset 和配置时一致
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            cmake --build --preset conan-default --target package
-          else
-            cmake --build --preset conan-release --target package
-          fi
+        # 移除平台判断，统一使用 conan-release preset
+        run: cmake --build --preset conan-release --target package
 
       # 9. 精准上传最终的安装包
       - name: Upload Package Artifact
