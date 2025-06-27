@@ -86,11 +86,10 @@ jobs:
         with:
           name: myproject-package-${{ matrix.os }}
           path: |
-            build/Release/
-            build/
-            *.deb
-            *.rpm
-            *.exe
-            *.zip
-            *.tar.gz
+            build/*.deb
+            build/*.rpm
+            build/*.dmg
+            build/*.exe
+            build/*.zip
+            build/*.tar.gz
           if-no-files-found: ignore
