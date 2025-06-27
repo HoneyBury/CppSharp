@@ -15,6 +15,7 @@ this file base on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，
 ### Changed
 - update connafile
 - update CMakeLists.txt
+- update cxx  standard required
 
 ### Fixed
 - fix install problem
