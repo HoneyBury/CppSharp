@@ -60,9 +60,6 @@ target_link_libraries(app PRIVATE my_lib)
 # 6. 应用我们定义的通用编译选项
 set_project_properties(app)
 
-# 7. (可选) 设置输出目录，使结构更整洁
-#set_target_properties(app PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-# --- 新增：为 app 可执行文件添加安装规则 ---
 install(TARGETS app
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} # 可执行文件 (.exe) 的安装位置
 )

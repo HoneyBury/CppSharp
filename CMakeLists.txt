@@ -1,126 +1,135 @@
-# ./CMakeLists.txt
+# ./CMakeLists.txt (Enhanced Version)
 
 # 1. 设置CMake最低版本和项目信息
 cmake_minimum_required(VERSION 3.15)
-project(Project VERSION 2.0.0 LANGUAGES CXX)
-# =================== 新增部分：健壮的输出目录设置 (最终版) ===================
-# 包含此模块以使用 CMAKE_CFG_INTDIR 变量，它能优雅地处理
-# 单配置（如Makefile）和多配置（如Visual Studio）生成器。
+project(MyProject VERSION 2.0.0
+        DESCRIPTION "A modern C++ project template using Conan and CMake"
+        LANGUAGES CXX)
+
+# 2. 包含 GNU 标准目录变量
 include(GNUInstallDirs)
 
-# 对于可执行文件 (runtime)
+# 3. 健壮的输出目录设置
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR})
-
-# 对于库文件 (archive for static, library for shared)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
+if(CMAKE_CONFIGURATION_TYPES)
+    foreach(config ${CMAKE_CONFIGURATION_TYPES})
+        string(TOUPPER ${config} config_upper)
+        set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${config_upper} ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR})
+        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
+        set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
+    endforeach()
+endif()
 
-# 对于Visual Studio（多配置生成器），需要特别处理以避免创建额外的Debug/Release子目录
-foreach(config ${CMAKE_CONFIGURATION_TYPES})
-    string(TOUPPER ${config} config_upper)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${config_upper} ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR})
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
-endforeach()
-# ==============================================================================
-
-# 2. 将自定义CMake模块路径添加到搜索路径
+# 4. 自定义CMake模块路径
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(utils)
+# 5. 全局构建选项
+option(BUILD_TESTING "Build the tests" ON)
+option(CPACK_CREATE_DESKTOP_SHORTCUT "Offer to create a desktop shortcut during installation" ON) # 新增选项
 
-
-
-
-# 4. 设置全局构建选项
-# 我们可以提供一个选项来决定是否构建测试
-option(BUILD_TESTING "Build the tests" OFF)
-
-# 5. 添加源代码子目录
+# 6. 添加子目录
 add_subdirectory(src)
-
-# 6. 如果启用了测试，则添加测试子目录
 if(BUILD_TESTING)
-    # 启用CTest测试框架
     enable_testing()
     add_subdirectory(tests)
 endif()
 
-# =================== 新增：安装与打包配置 (最终修正版) ===================
-# 1. 包含CMake的打包和安装辅助模块
+# =================== 安装与打包配置 (CPack) ===================
 include(CMakePackageConfigHelpers)
-include(CPack)
 
-# 2. 根据操作系统，条件性地设置 CPack 生成器
-if(WIN32)
-  # 在 Windows 上，使用 NSIS 创建 .exe 安装程序
-  set(CPACK_GENERATOR "NSIS")
-elseif(UNIX AND NOT APPLE)
-  # 在 Linux (GitHub Actions 的 runner 是基于 Debian/Ubuntu 的) 上，创建 .deb 包
-  set(CPACK_GENERATOR "DEB")
-elseif(APPLE)
-  # 在 macOS 上，创建用户友好的 .dmg 拖拽安装包
-  set(CPACK_GENERATOR "DragNDrop")
-endif()
-
-# 3. 设置通用的包元数据 (强烈推荐)
+# 设置通用元数据
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_VENDOR "MyProject Inc.")
+set(PROJECT_AUTHOR "HoneyBury zoujiahe389@gmail.com")
 set(CPACK_PACKAGE_CONTACT "${PROJECT_AUTHOR}")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE") # 假设你有一个LICENSE文件
-set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md") # 假设你有一个README.md
+set(PROJECT_URL "https://github.com/HoneyBury/CppSharp.git")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 
-# 4. 设置 DEB 包的特定元数据 (可选，但推荐)
-if(CPACK_GENERATOR STREQUAL "DEB")
-  set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${PROJECT_AUTHOR}")
-  set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
-  set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+# 自定义安装包输出文件名
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(ARCH_SUFFIX "win64")
+else()
+    set(ARCH_SUFFIX "win32")
+endif()
+set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-${ARCH_SUFFIX}")
+
+# 根据操作系统设置CPack生成器
+if(WIN32)
+    set(CPACK_GENERATOR "NSIS")
+elseif(UNIX AND NOT APPLE)
+    set(CPACK_GENERATOR "DEB")
+elseif(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
 endif()
 
-# 5. 设置 NSIS 安装程序的特定元数据 (可选)
+# --- 增强的 NSIS 特定配置 ---
 if(CPACK_GENERATOR STREQUAL "NSIS")
-  set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_NAME} ${CPACK_PACKAGE_VERSION}")
-  set(CPACK_NSIS_PUBLISHER "${CPACK_PACKAGE_VENDOR}")
-  set(CPACK_NSIS_URL_INFO_ABOUT "${PROJECT_URL}")
+    # 基础信息
+    set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_NAME} ${CPACK_PACKAGE_VERSION}")
+    set(CPACK_NSIS_PUBLISHER "${CPACK_PACKAGE_VENDOR}")
+    set(CPACK_NSIS_URL_INFO_ABOUT "${PROJECT_URL}")
+    set(CPACK_NSIS_HELP_LINK "${PROJECT_URL}/issues")
+    set(CPACK_NSIS_CONTACT "${CPACK_PACKAGE_CONTACT}")
+
+    # 安装程序外观和图标
+    set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/install_icon.ico")
+    set(CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/uninstall_icon.ico")
+
+    # 开始菜单设置
+    set(CPACK_NSIS_PACKAGE_NAME "${CPACK_PACKAGE_NAME}") # 开始菜单文件夹的名称
+    set(CPACK_NSIS_CREATE_ICONS_EXTRA "") # 初始化快捷方式列表
+    list(APPEND CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '$SMPROGRAMS\\\\${CPACK_NSIS_PACKAGE_NAME}\\\\${PROJECT_NAME}.lnk' '$INSTDIR\\\\bin\\\\${PROJECT_NAME}.exe'")
+    list(APPEND CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '$SMPROGRAMS\\\\${CPACK_NSIS_PACKAGE_NAME}\\\\Uninstall.lnk' '$INSTDIR\\\\Uninstall.exe'")
+
+    # 桌面快捷方式 (如果选项开启)
+    if(CPACK_CREATE_DESKTOP_SHORTCUT)
+        list(APPEND CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '$DESKTOP\\\\${PROJECT_NAME}.lnk' '$INSTDIR\\\\bin\\\\${PROJECT_NAME}.exe'")
+    endif()
+
+    # 在开始菜单中添加网页链接
+    set(CPACK_NSIS_MENU_LINKS "${PROJECT_URL}" "Project Website")
+
+    # 安装过程中的用户选项
+    set(CPACK_NSIS_MODIFY_PATH ON) # 提供 "添加到系统 PATH" 的选项，并默认勾选
+
 endif()
 
-# 6. 设置源文件打包时要忽略的文件
-set(CPACK_SOURCE_IGNORE_FILES
-    "/.git/"
-    "/build/"
-    "/.vscode/"
-    "/.idea/"
-    ".DS_Store"
-    "*.swp"
-    "*.bak"
-)
+# --- DEB 包特定配置 ---
+if(CPACK_GENERATOR STREQUAL "DEB")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${PROJECT_AUTHOR}")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+    set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+endif()
 
-# 7. 生成 MyProjectConfigVersion.cmake 文件
+# 设置源文件打包时要忽略的文件
+set(CPACK_SOURCE_IGNORE_FILES "/.git/" "/build/" "/.vscode/" "/.idea/" ".DS_Store" "*.swp" "*.bak" "/.venv/")
+
+# 生成和安装 CMake 包配置文件 (供开发者使用)
 write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY AnyNewerVersion
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY AnyNewerVersion
 )
-
-# 8. 配置并生成 MyProjectConfig.cmake 文件
 configure_package_config_file(
-    "${PROJECT_SOURCE_DIR}/cmake/config.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+        "${CMAKE_SOURCE_DIR}/cmake/config.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
-
-# 9. 将生成的配置文件安装到指定位置
 install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+)
+install(EXPORT ${PROJECT_NAME}Targets
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
-# 10. 安装由我们导出的目标文件 (MyProjectTargets.cmake)
-install(EXPORT ${PROJECT_NAME}Targets
-    FILE ${PROJECT_NAME}Targets.cmake
-    NAMESPACE ${PROJECT_NAME}::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
-)
-# ==========================================================================
+# 最后包含 CPack 模块，使其应用所有上述配置
+include(CPack)
