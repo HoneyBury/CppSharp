@@ -86,12 +86,12 @@ jobs:
         with:
           name: myproject-package-${{ matrix.os }}
           path: |
-            build/release/*.deb
-            build/release/*.rpm
-            build/release/*.dmg
-            build/release/*.exe
-            build/release/*.zip
-            build/release/*.tar.gz
+            build/Release/*.deb
+            build/Release/*.rpm
+            build/Release/*.dmg
+            build/Release/*.exe
+            build/Release/*.zip
+            build/Release/*.tar.gz
             build/*.deb
             build/*.rpm
             build/*.dmg
