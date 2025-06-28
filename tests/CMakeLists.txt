@@ -10,7 +10,7 @@ add_executable(unit_tests
 
 # 步骤 2: 链接 unit_tests 到我们的库和GTest
 target_link_libraries(unit_tests PRIVATE
-        my_lib
+        ${PROJECT_NAME}
         GTest::gtest_main
 )
 

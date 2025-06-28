@@ -2,7 +2,7 @@
 
 # 1. 设置CMake最低版本和项目信息
 cmake_minimum_required(VERSION 3.23)
-project(CppSharp VERSION 4.1.1
+project(CppSharp VERSION 4.1.2
         DESCRIPTION "A modern C++ project template using Conan and CMake"
         LANGUAGES CXX)
 

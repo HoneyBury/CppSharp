@@ -64,7 +64,7 @@ AllowTrailingCommas: true       # 允许在列表的最后一个元素后添加�
 #    Priority:        2
 #  - Regex:           '^(fmt/|spdlog/|gtest/).*' # 匹配Conan管理的第三方库
 #    Priority:        3
-#  - Regex:           '^my_lib/.*' # 匹配项目内其他模块的头文件
+#  - Regex:           '^cppsharp/.*' # 匹配项目内其他模块的头文件
 #    Priority:        4
 #  - Regex:           '.*' # 匹配与当前文件在同一目录的头文件
 #    Priority:        5
