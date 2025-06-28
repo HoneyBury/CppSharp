@@ -2,7 +2,7 @@
 
 # 1. 设置CMake最低版本和项目信息
 cmake_minimum_required(VERSION 3.15)
-project(CppSharp VERSION 4.0.0
+project(CppSharp VERSION 4.0.1
         DESCRIPTION "A modern C++ project template using Conan and CMake"
         LANGUAGES CXX)
 
@@ -50,13 +50,28 @@ set(PROJECT_URL "https://github.com/HoneyBury/CppSharp.git")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 
-# 自定义安装包输出文件名
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(ARCH_SUFFIX "win64")
+# --- 自定义跨平台的安装包输出文件名 ---
+
+# 1. 获取并规范化操作系统名称
+# CMAKE_SYSTEM_NAME 的值可能是 "Windows", "Linux", "Darwin" (macOS) 等
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(OS_IDENTIFIER "macos")
 else()
-    set(ARCH_SUFFIX "win32")
+    # 将 "Windows" -> "windows", "Linux" -> "linux"
+    string(TOLOWER "${CMAKE_SYSTEM_NAME}" OS_IDENTIFIER)
 endif()
-set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-${ARCH_SUFFIX}")
+
+# 2. 获取通用架构名称
+# 使用 CMAKE_SIZEOF_VOID_P 判断是 32 位还是 64 位，这是最可靠和通用的方法
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(ARCH_IDENTIFIER "x64")
+else()
+    set(ARCH_IDENTIFIER "x86")
+endif()
+
+# 3. 组合成最终的文件名
+# 格式: ProjectName-Version-OS-Arch
+set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-${OS_IDENTIFIER}-${ARCH_IDENTIFIER}")
 
 # 根据操作系统设置CPack生成器
 if(WIN32)
