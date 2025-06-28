@@ -3,6 +3,8 @@
 //
 #include "cppsharp/my_lib.hpp"
 #include <fmt/core.h> // 使用 fmt
+// 使用我们的依赖库
+#include <spdlog/spdlog.h>
 void greet(const std::string& name) {
     // 使用 fmt 库格式化字符串
     std::string message = fmt::format("Hello, {}! Welcome to our modern C++ project.", name);
