@@ -13,8 +13,8 @@
 
 ## 依赖
 
--   C++ 编译器 (支持 C++17)
--   CMake (>= 3.15)
+-   C++ 编译器 (支持 C++14及以上)
+-   CMake (>= 3.23)
 -   Conan (>= 2.0)
 
 ## 如何构建
@@ -79,8 +79,9 @@
     ```
 6. **打包**
     ```bash
+    #cmake的版本要求3.23及以上版本
      cmake --build --preset conan-debug --target package
-   # 或者可以使用cpack安装
+    #或者可以使用cpack安装
    
    ```
     

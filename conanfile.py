@@ -79,7 +79,7 @@ class MyProjectConan(ConanFile):
         # 限制最低标准
         if self.settings.compiler.cppstd:
             if Version(self.settings.compiler.cppstd) < "14":
-                raise ConanInvalidConfiguration("MyProject requires at least C++17.")
+                raise ConanInvalidConfiguration("MyProject requires at least C++14.")
 
     # 8. Layout (保持不变)
     def layout(self):
