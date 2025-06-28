@@ -50,27 +50,25 @@ set(PROJECT_URL "https://github.com/HoneyBury/CppSharp.git")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 
-# --- 自定义跨平台的安装包输出文件名 ---
+# --- 更精细的跨平台安装包文件名 (区分处理器架构) ---
 
 # 1. 获取并规范化操作系统名称
-# CMAKE_SYSTEM_NAME 的值可能是 "Windows", "Linux", "Darwin" (macOS) 等
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(OS_IDENTIFIER "macos")
 else()
-    # 将 "Windows" -> "windows", "Linux" -> "linux"
     string(TOLOWER "${CMAKE_SYSTEM_NAME}" OS_IDENTIFIER)
 endif()
 
-# 2. 获取通用架构名称
-# 使用 CMAKE_SIZEOF_VOID_P 判断是 32 位还是 64 位，这是最可靠和通用的方法
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+# 2. 获取处理器架构名称
+# CMAKE_SYSTEM_PROCESSOR 的值可能是 "x86_64", "AMD64", "arm64", "aarch64" 等
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" ARCH_IDENTIFIER)
+
+# (可选) 统一 x86_64 架构的名称为 "x64"
+if(ARCH_IDENTIFIER STREQUAL "amd64" OR ARCH_IDENTIFIER STREQUAL "x86_64")
     set(ARCH_IDENTIFIER "x64")
-else()
-    set(ARCH_IDENTIFIER "x86")
 endif()
 
 # 3. 组合成最终的文件名
-# 格式: ProjectName-Version-OS-Arch
 set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-${OS_IDENTIFIER}-${ARCH_IDENTIFIER}")
 
 # 根据操作系统设置CPack生成器
