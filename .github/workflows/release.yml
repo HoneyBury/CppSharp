@@ -47,7 +47,7 @@ jobs:
         run: conan profile detect --force
 
       - name: Install Conan dependencies
-        run: conan install . --build=missing -s build_type="${BUILD_TYPE}"
+        run: conan install . --build=missing -s build_type="${BUILD_TYPE}" -c tools.cmake.cmaketoolchain:generator=Ninja
 
       - name: Configure CMake
         run: cmake --preset conan-release -DBUILD_TESTING=OFF
@@ -58,17 +58,21 @@ jobs:
       - name: Package
         run: cmake --build --preset conan-release --target package
 
+      - name: Stage package artifact
+        run: |
+          mkdir -p staging
+          find build -type f \
+            \( -name "*.deb" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.tar.gz" -o -name "*.zip" \) \
+            ! -path "*/_CPack_Packages/*" \
+            -exec cp {} staging/ \;
+          ls -la staging
+          test -n "$(ls -A staging)"
+
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.os }}
-          path: |
-            build/release/*.deb
-            build/release/*.dmg
-            build/release/*.exe
-            build/release/*.msi
-            build/release/*.tar.gz
-            build/release/*.zip
+          path: staging/
           if-no-files-found: error
 
   create-release:
