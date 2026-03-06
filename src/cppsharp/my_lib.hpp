@@ -3,9 +3,7 @@
 
 #include <string>
 
-
-
 void greet(const std::string& name);
 void setup_logger();
 
-#endif // MY_LIB_HPP
+#endif  // MY_LIB_HPP
