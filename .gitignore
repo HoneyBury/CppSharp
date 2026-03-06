@@ -38,3 +38,4 @@ cmake-build-*/
 
 .conan2/
 __pycache__/
+CMakeUserPresets.json
