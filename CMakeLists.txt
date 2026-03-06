@@ -1,4 +1,4 @@
-# ./CMakeLists.txt (Enhanced Version)
+﻿# ./CMakeLists.txt (Enhanced Version)
 
 # 1. 设置CMake最低版本和项目信息
 cmake_minimum_required(VERSION 3.23)

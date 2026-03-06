@@ -1,4 +1,4 @@
-# cmake/utils.cmake
+﻿# cmake/utils.cmake
 
 # 设置项目范围内的编译选项和属性
 function(set_project_properties target)

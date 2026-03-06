@@ -1,0 +1,83 @@
+﻿version: "3"
+
+tasks:
+  setup:
+    desc: Install local build tooling
+    env:
+      CONAN_HOME: "{{.TASKFILE_DIR}}/.conan2"
+    cmds:
+      - python3 -m pip install --user --break-system-packages --upgrade pip
+      - python3 -m pip install --user --break-system-packages conan ninja
+      - conan profile detect --force
+
+  configure:
+    desc: Configure CMake with Conan (BUILD_TYPE=Debug|Release)
+    env:
+      CONAN_HOME: "{{.TASKFILE_DIR}}/.conan2"
+    vars:
+      BUILD_TYPE: '{{default "Debug" .BUILD_TYPE}}'
+    cmds:
+      - conan install . --build=missing -s build_type={{.BUILD_TYPE}}
+      - cmake --preset conan-{{lower .BUILD_TYPE}} -DBUILD_TESTING=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+  build:
+    desc: Build project (BUILD_TYPE=Debug|Release)
+    vars:
+      BUILD_TYPE: '{{default "Debug" .BUILD_TYPE}}'
+    deps: [configure]
+    cmds:
+      - cmake --build --preset conan-{{lower .BUILD_TYPE}} --parallel
+
+  test:
+    desc: Run unit tests (BUILD_TYPE=Debug|Release)
+    vars:
+      BUILD_TYPE: '{{default "Debug" .BUILD_TYPE}}'
+    deps: [build]
+    cmds:
+      - ctest --preset conan-{{lower .BUILD_TYPE}} --output-on-failure
+
+  package:
+    desc: Build release package
+    cmds:
+      - task: configure
+        vars:
+          BUILD_TYPE: Release
+      - cmake --build --preset conan-release --parallel
+      - cmake --build --preset conan-release --target package
+
+  format:
+    desc: Format C/C++ code and normalize text files
+    cmds:
+      - bash scripts/run_clang_format.sh
+      - python3 scripts/normalize_text.py
+
+  check-format:
+    desc: Check formatting and text normalization
+    cmds:
+      - bash scripts/run_clang_format.sh --check
+      - python3 scripts/normalize_text.py --check
+
+  lint:
+    desc: Run static analysis
+    vars:
+    cmds:
+      - cppcheck --std=c++17 --enable=warning,style,performance,portability --error-exitcode=1 --inline-suppr src tests
+      - >-
+        CLANG_TIDY_BIN="${CLANG_TIDY_BIN:-$(command -v clang-tidy || true)}";
+        if [ -z "$CLANG_TIDY_BIN" ] && [ -x "/opt/homebrew/opt/llvm/bin/clang-tidy" ]; then
+          CLANG_TIDY_BIN="/opt/homebrew/opt/llvm/bin/clang-tidy";
+        fi;
+        if [ -z "$CLANG_TIDY_BIN" ]; then
+          echo "clang-tidy not found. Set CLANG_TIDY_BIN or add it to PATH.";
+          exit 127;
+        fi;
+        "$CLANG_TIDY_BIN" src/main.cpp src/cppsharp/my_lib.cpp tests/main_test.cpp -p build/Debug
+
+  ci:
+    desc: Local CI pipeline
+    cmds:
+      - task: check-format
+      - task: test
+        vars:
+          BUILD_TYPE: Debug
+      - task: lint

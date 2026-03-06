@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 log for this program 
 
 this file base on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，

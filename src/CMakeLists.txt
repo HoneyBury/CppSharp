@@ -1,4 +1,4 @@
-# src/CMakeLists.txt (修改后)
+﻿# src/CMakeLists.txt (修改后)
 
 # 1. 使用项目名创建核心库，而不是硬编码的 "cppsharp"
 add_library(${PROJECT_NAME} STATIC

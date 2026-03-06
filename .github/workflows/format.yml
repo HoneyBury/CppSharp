@@ -1,0 +1,41 @@
+﻿name: Auto Format
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install format tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Run formatters
+        run: |
+          bash scripts/run_clang_format.sh
+          python3 scripts/normalize_text.py
+
+      - name: Auto commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: auto format and normalize text [skip ci]"
+          branch: ${{ github.ref_name }}
+          file_pattern: "*.h *.hpp *.c *.cc *.cpp *.cmake CMakeLists.txt *.md *.txt *.yml *.yaml *.json"

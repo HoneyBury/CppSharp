@@ -1,101 +1,145 @@
-# .github/workflows/ci.yml
-
-name: C++ CI with Conan, CMake, and CPack
+﻿name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+permissions:
+  contents: read
 
 jobs:
+  quality:
+    name: Quality (Linux)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_TYPE: Debug
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install conan ninja
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy cppcheck
+
+      - name: Conan profile
+        run: conan profile detect --force
+
+      - name: Install Conan dependencies
+        run: conan install . --build=missing -s build_type="${BUILD_TYPE}"
+
+      - name: Configure CMake
+        run: cmake --preset conan-debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_TESTING=ON
+
+      - name: Encoding and newline check
+        run: python3 scripts/normalize_text.py --check
+
+      - name: clang-format check
+        run: bash scripts/run_clang_format.sh --check
+
+      - name: Build
+        run: cmake --build --preset conan-debug --parallel
+
+      - name: Unit tests
+        run: ctest --preset conan-debug --output-on-failure
+
+      - name: cppcheck
+        run: |
+          cppcheck \
+            --std=c++17 \
+            --enable=warning,style,performance,portability \
+            --error-exitcode=1 \
+            --inline-suppr \
+            src tests
+
+      - name: clang-tidy
+        shell: bash
+        run: |
+          mapfile -t cpp_files < <(git ls-files '*.cpp' | grep -E '^(src|tests)/')
+          if [ "${#cpp_files[@]}" -eq 0 ]; then
+            echo "No C++ source files found."
+            exit 0
+          fi
+          clang-tidy "${cpp_files[@]}" -p build/Debug
+
   build-test-package:
-    name: ${{ matrix.os }} - ${{ matrix.build_type }}
+    name: ${{ matrix.os }} / ${{ matrix.build_type }}
+    needs: quality
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         build_type: [Debug, Release]
-
-    runs-on: ${{ matrix.os }}
-
+    env:
+      BUILD_TYPE: ${{ matrix.build_type }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      # 步骤 1-5: 保持不变
-      - name: Checkout repository code
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Install CPack Generators
-        if: matrix.build_type == 'Release' && runner.os == 'Windows'
-        run: choco install nsis
-      - name: Setup Python for Conan
+
+      - name: Setup MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install NSIS
+        if: runner.os == 'Windows' && matrix.build_type == 'Release'
+        run: choco install nsis -y
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install Conan and create default profile
+          python-version: "3.11"
+
+      - name: Install Conan and Ninja
         run: |
-          pip install conan
-          conan profile detect --force
-      - name: Cache Conan packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.conan2/p
-          key: conan-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('**/conanfile.py') }}
-          restore-keys: |
-            conan-${{ runner.os }}-${{ matrix.build_type }}-
-      - name: Install dependencies with Conan
-        run: conan install . --build=missing -s build_type=${{ matrix.build_type }}
+          python -m pip install --upgrade pip
+          pip install conan ninja
 
-      # 步骤 5.5: 获取小写名
-      - name: Set lowercase build type
-        id: build_type_lc
-        run: echo "value=$(echo "${{ matrix.build_type }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-        shell: bash
+      - name: Conan profile
+        run: conan profile detect --force
 
-      # (!!!) 步骤 6: 平台感知的 CMake 配置 (最终修正版) (!!!)
-      # 这是唯一需要平台判断的步骤
+      - name: Install Conan dependencies
+        run: conan install . --build=missing -s build_type="${BUILD_TYPE}"
+
       - name: Configure CMake
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            # Windows 只有一个配置预设，名为 "conan-default"
-            cmake --preset conan-default -DBUILD_TESTING=ON
-          else
-            # Linux/macOS 的配置预设与构建类型同名
-            cmake --preset conan-${{ steps.build_type_lc.outputs.value }} -DBUILD_TESTING=ON
-          fi
+        run: cmake --preset conan-${BUILD_TYPE,,} -DBUILD_TESTING=ON
 
-      # (!!!) 步骤 7: 统一的 CMake 构建 (!!!)
-      # 构建预设在所有平台上都是同名的 ('conan-release' 或 'conan-debug')
-      - name: Build project with CMake
-        run: cmake --build --preset conan-${{ steps.build_type_lc.outputs.value }}
+      - name: Build
+        run: cmake --build --preset conan-${BUILD_TYPE,,} --parallel
 
-      # (!!!) 步骤 8: 统一的单元测试 (!!!)
-      # 测试预设在所有平台上也是同名的
-      - name: Run Unit Tests with CTest
+      - name: Test (Debug only)
         if: matrix.build_type == 'Debug'
-        run: ctest --preset conan-debug
+        run: ctest --preset conan-debug --output-on-failure
 
-      # (!!!) 步骤 9: 统一的打包 (!!!)
-      # 使用构建预设来驱动打包目标，在所有平台上都有效
-      - name: Create package with CPack
+      - name: Package (Release only)
         if: matrix.build_type == 'Release'
         run: cmake --build --preset conan-release --target package
 
-      # 步骤 10: 上传产物 - 无需改动
-      - name: Upload Build Artifacts
+      - name: Upload packages
         if: matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
         with:
-          name: myproject-package-${{ matrix.os }}
+          name: packages-${{ matrix.os }}
           path: |
-            build/Release/*.deb
-            build/Release/*.rpm
-            build/Release/*.dmg
-            build/Release/*.exe
-            build/Release/*.zip
-            build/Release/*.tar.gz
-            build/*.deb
-            build/*.rpm
-            build/*.dmg
-            build/*.exe
-            build/*.zip
-            build/*.tar.gz
-          if-no-files-found: ignore
+            build/release/*.deb
+            build/release/*.dmg
+            build/release/*.exe
+            build/release/*.msi
+            build/release/*.tar.gz
+            build/release/*.zip
+          if-no-files-found: error

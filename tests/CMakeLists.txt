@@ -1,4 +1,4 @@
-# tests/CMakeLists.txt
+﻿# tests/CMakeLists.txt
 
 find_package(GTest REQUIRED)
 

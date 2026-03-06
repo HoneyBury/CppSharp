@@ -1,86 +1,87 @@
-﻿# My Modern C++ Project
+﻿# CppSharp - Modern C++ Scaffold
 
-这是一个基于现代CMake和Conan 2.0的C++项目脚手架。
+这是一个基于 `CMake + Conan 2 + GoogleTest + CPack` 的 C++ 脚手架，已针对日常在 macOS + Codex CLI + CLion 的开发场景做了跨平台工程化升级。
 
-## 特性
+## 核心升级
 
--   C++17 标准，支持 C++14 及以上
--   CMake (Target-based)
--   Conan 2.0 依赖管理，自动从 CMakeLists.txt 读取项目信息
--   Google Test 集成
--   跨平台打包（支持 NSIS/DEB/DragNDrop 等）
--   支持桌面/开始菜单快捷方式、图标自定义
--   清晰的项目结构，源码/测试/资源分离
--   Github Action CI/CD 集成
+- CI/CD 覆盖 Linux / Windows / macOS
+- 统一构建链路：`Conan + CMake + Ninja`
+- 自动格式化并自动提交（`main` 分支）
+- 统一编码和换行：源码/配置/文档使用 UTF-8 BOM + LF
+- 静态检查：`cppcheck + clang-tidy`
+- 本地任务编排：`Taskfile.yml`
 
-## 依赖
+## 目录中的工程化文件
 
--   C++ 编译器 (支持 C++14及以上)
--   CMake (>= 3.23)
--   Conan (>= 2.0)
+- `.github/workflows/ci.yml`：主 CI（质量门禁 + 三平台构建测试打包）
+- `.github/workflows/release.yml`：tag 发布流程（`v*`）
+- `.github/workflows/format.yml`：自动格式化并自动提交
+- `.editorconfig`：编辑器统一规范
+- `.gitattributes`：Git 层面统一编码/换行策略
+- `.clang-tidy`：静态分析规则
+- `Taskfile.yml`：本地命令入口
+- `scripts/run_clang_format.sh`：C/C++ 格式化
+- `scripts/normalize_text.py`：编码/换行归一化（支持 `--check`）
 
-## 如何构建
+## 快速开始
 
-1.  **克隆仓库**
-    ```bash
-    git clone https://github.com/HoneyBury/CppSharp.git
-    cd CppSharp
-    ```
+1. 安装依赖
 
-2.  **安装Conan依赖**
-    此命令会读取 `conanfile.py`，下载依赖，并在 `build/` 目录下生成CMake集成所需的文件。
-    ```bash
-    conan install . -s build_type=Debug --build=missing
-    conan install . -s build_type=Release --build=missing
-    ```
+```bash
+python3 -m pip install --upgrade pip
+python3 -m pip install conan ninja
+conan profile detect --force
+```
 
-3.  **配置CMake项目**
-    使用Conan生成的toolchain文件来配置CMake。
-    ```bash
-    # 推荐使用预设命令（Windows/Linux/Mac 通用）
-    cmake --preset conan-debug
-    cmake --preset conan-release
-    # 或手动指定 toolchain
-    cmake -S . -B build/release -DCMAKE_TOOLCHAIN_FILE="build/generators/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
-    cmake -S . -B build/debug -DCMAKE_TOOLCHAIN_FILE="build/generators/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Debug
-    ```
+2. Debug 构建与测试
 
-4.  **构建项目**
-    ```bash
-    cmake --build --preset conan-debug
-    cmake --build --preset conan-release
-    # 或
-    cmake --build build/release
-    cmake --build build/debug
-    ```
+```bash
+task test BUILD_TYPE=Debug
+```
 
-5.  **运行**
-    ```bash
-    # 运行主程序
-    ./build/release/bin/app
-    # Windows 预设方式
-    ./build/bin/app
-    # 运行测试
-    cd build/release
-    ctest -C Release --output-on-failure
-    cd ../..
-    ```
+3. Release 打包
 
-6. **打包与安装包生成**
-    ```bash
-    # 推荐使用 CPack 生成安装包（需 CMake >= 3.23）
-    cmake --build --preset conan-release --target package
-    # 或直接用 cpack
-    cpack -G NSIS   # Windows 下生成 .exe 安装包
-    cpack -G DEB    # Linux 下生成 .deb 包
-    cpack -G DragNDrop # Mac 下生成 .dmg 包
-    ```
-    - 安装包会自动包含 LICENSE、README.md、图标、快捷方式等资源。
-    - Windows 下支持桌面/开始菜单快捷方式，图标自定义。
+```bash
+task package
+```
 
-## 其他说明
+## 常用 Task
 
-- `conanfile.py` 会自动从 `CMakeLists.txt` 读取项目名称、版本、描述，确保元数据一致。
-- `CMakeLists.txt` 支持多平台、多架构输出目录和打包配置。
-- 所有源码、测试、资源、配置文件均通过 Conan/CMake 自动导出和打包。
-- 如需自定义打包行为，可修改 `CMakeLists.txt` 中的 CPack/NSIS/DEB 相关配置。
+```bash
+task setup
+task configure BUILD_TYPE=Debug
+task build BUILD_TYPE=Debug
+task test BUILD_TYPE=Debug
+task format
+task check-format
+task lint
+task ci
+```
+
+## 编码与换行策略
+
+- 默认文本文件：UTF-8 BOM + LF
+- JSON（含 CMake Presets）：UTF-8（无 BOM）+ LF
+- 脚本文件（`.py/.sh/.bat/.ps1`）：UTF-8（无 BOM）
+  - 原因：解释器脚本使用 BOM 可能影响 shebang/执行行为
+
+CI 会执行：
+
+```bash
+python3 scripts/normalize_text.py --check
+bash scripts/run_clang_format.sh --check
+```
+
+## 自动格式化与自动提交
+
+`format.yml` 在 `main` 分支 push 或手动触发时执行：
+
+1. `clang-format` 格式化 C/C++
+2. 编码/换行归一化
+3. 若有变更则自动提交到当前分支
+
+## 发布流程
+
+- 创建并推送 tag：`vX.Y.Z`
+- `release.yml` 会在三平台构建并生成安装包
+- 自动创建 GitHub Release，并上传所有产物
